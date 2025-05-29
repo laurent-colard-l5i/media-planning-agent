@@ -12,7 +12,6 @@ import logging
 
 try:
     from anthropic import Anthropic
-
     ANTHROPIC_AVAILABLE = True
 except ImportError:
     ANTHROPIC_AVAILABLE = False
@@ -21,7 +20,6 @@ from .base import BaseAgent, AgentConfigurationError, AgentCommunicationError
 from ..tools.base import get_tool_registry
 
 logger = logging.getLogger(__name__)
-
 
 class ClaudeAgent(BaseAgent):
     """Claude-powered media planning agent with function calling support."""
@@ -158,8 +156,10 @@ Remember: Your goal is to make media planning more efficient and strategic throu
         try:
             # Get available tools if requested
             tools = self.get_available_tools() if use_tools else None
+            logger.debug(f"Using {len(tools) if tools else 0} tools for this request")
 
             # Make initial API call
+            logger.debug("Making initial API call to Claude")
             response = self.client.messages.create(
                 model=self.model_name,
                 max_tokens=self.max_tokens,
@@ -168,23 +168,34 @@ Remember: Your goal is to make media planning more efficient and strategic throu
                 tools=tools
             )
 
+            logger.debug(f"Received response with {len(response.content)} content blocks")
+
             response_text = ""
             tool_calls_made = []
 
-            # Process response content
-            for content_block in response.content:
+            # Process response content with better error handling
+            for i, content_block in enumerate(response.content):
+                logger.debug(f"Processing content block {i}: type={content_block.type}")
+
                 if content_block.type == "text":
                     response_text += content_block.text
+                    logger.debug(f"Added text content: {content_block.text[:100]}...")
+
                 elif content_block.type == "tool_use":
+                    logger.debug(f"Executing tool: {content_block.name}")
                     # Execute tool and collect results
                     tool_result = self._execute_tool(content_block)
                     tool_calls_made.append({
                         "tool_name": content_block.name,
-                        "result": tool_result
+                        "result": tool_result,
+                        "tool_use_id": content_block.id
                     })
+                    logger.debug(f"Tool {content_block.name} executed, success: {tool_result.get('success', 'unknown')}")
 
             # If tools were called, we need to continue the conversation
             if tool_calls_made:
+                logger.debug(f"Processing {len(tool_calls_made)} tool results")
+
                 # Add assistant message with tool calls to history
                 self.conversation_history.append({
                     "role": "assistant",
@@ -192,18 +203,18 @@ Remember: Your goal is to make media planning more efficient and strategic throu
                 })
 
                 # Add tool results to history
-                for i, content_block in enumerate(response.content):
-                    if content_block.type == "tool_use":
-                        self.conversation_history.append({
-                            "role": "user",
-                            "content": [{
-                                "type": "tool_result",
-                                "tool_use_id": content_block.id,
-                                "content": json.dumps(tool_calls_made[i]["result"])
-                            }]
-                        })
+                for i, tool_call in enumerate(tool_calls_made):
+                    self.conversation_history.append({
+                        "role": "user",
+                        "content": [{
+                            "type": "tool_result",
+                            "tool_use_id": tool_call["tool_use_id"],
+                            "content": json.dumps(tool_call["result"])
+                        }]
+                    })
 
                 # Get follow-up response after tool execution
+                logger.debug("Getting follow-up response from Claude")
                 follow_up_response = self.client.messages.create(
                     model=self.model_name,
                     max_tokens=self.max_tokens,
@@ -212,11 +223,15 @@ Remember: Your goal is to make media planning more efficient and strategic throu
                     tools=tools
                 )
 
-                # Extract text from follow-up response
+                logger.debug(f"Follow-up response has {len(follow_up_response.content)} content blocks")
+
+                # Extract text from follow-up response with error handling
                 follow_up_text = ""
-                for content_block in follow_up_response.content:
+                for i, content_block in enumerate(follow_up_response.content):
+                    logger.debug(f"Processing follow-up content block {i}: type={content_block.type}")
                     if content_block.type == "text":
                         follow_up_text += content_block.text
+                        logger.debug(f"Added follow-up text: {content_block.text[:100]}...")
 
                 response_text = follow_up_text
 
@@ -238,9 +253,14 @@ Remember: Your goal is to make media planning more efficient and strategic throu
             if response_text:
                 self.session_state.add_conversation_turn(message, response_text)
 
+            logger.debug(f"Final response length: {len(response_text)} characters")
             return response_text or "I executed some tools but didn't provide a text response."
 
         except Exception as e:
+            logger.error(f"Claude communication error: {e}")
+            import traceback
+            logger.error(f"Full traceback: {traceback.format_exc()}")
+
             error_msg = self.handle_error(e, "processing your request")
 
             # Add error to conversation history
@@ -293,6 +313,8 @@ Remember: Your goal is to make media planning more efficient and strategic throu
                 "error_type": type(e).__name__
             }
             logger.error(f"Tool execution failed for {tool_name}: {e}")
+            import traceback
+            logger.error(f"Tool execution traceback: {traceback.format_exc()}")
             return error_result
 
     def get_available_tools(self) -> List[Dict[str, Any]]:
