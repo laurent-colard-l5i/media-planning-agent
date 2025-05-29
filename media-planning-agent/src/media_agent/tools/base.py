@@ -6,7 +6,7 @@ the agent can use to interact with the MediaPlanPy SDK and workspace.
 """
 
 from abc import ABC, abstractmethod
-from typing import Dict, Any, List, Callable, Optional, Type
+from typing import Dict, Any, List, Callable, Optional, Type, get_type_hints
 from functools import wraps
 import inspect
 import logging
@@ -41,7 +41,12 @@ class Tool(ABC):
         required = []
 
         for param_name, param in sig.parameters.items():
-            if param_name == 'session_state':
+            # Skip session_state and **kwargs
+            if param_name in ['session_state', 'kwargs']:
+                continue
+
+            # Skip **kwargs parameters
+            if param.kind == param.VAR_KEYWORD:
                 continue
 
             # Get parameter type

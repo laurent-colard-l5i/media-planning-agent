@@ -26,13 +26,17 @@ def load_workspace(session_state, workspace_path: Optional[str] = None, **kwargs
 
     Args:
         session_state: Current session state
-        workspace_path: Path to workspace.json file (optional, will use default locations if not provided)
+        workspace_path: Path to workspace.json file (optional, will use environment variable or default locations if not provided)
         **kwargs: Additional arguments (ignored for compatibility)
 
     Returns:
         Success/error result with workspace information
     """
     try:
+        # If no workspace_path provided, try environment variable
+        if not workspace_path:
+            workspace_path = os.getenv('MEDIAPLANPY_WORKSPACE_PATH')
+
         logger.info(f"Loading workspace from path: {workspace_path or 'default locations'}")
 
         # Create workspace manager
@@ -59,7 +63,8 @@ def load_workspace(session_state, workspace_path: Optional[str] = None, **kwargs
             "storage_mode": config.get('storage', {}).get('mode', 'Unknown'),
             "database_enabled": config.get('database', {}).get('enabled', False),
             "status": config.get('workspace_status', 'Unknown'),
-            "schema_version": config.get('schema_settings', {}).get('preferred_version', 'Unknown')
+            "schema_version": config.get('schema_settings', {}).get('preferred_version', 'Unknown'),
+            "loaded_from": workspace_path or "default locations"
         }
 
         logger.info(f"Successfully loaded workspace: {workspace_info['name']}")
@@ -77,7 +82,9 @@ def load_workspace(session_state, workspace_path: Optional[str] = None, **kwargs
         error_msg = "❌ Workspace configuration file not found"
         if workspace_path:
             error_msg += f" at {workspace_path}"
-        error_msg += ". Please check the path or create a workspace configuration."
+        else:
+            error_msg += ". No workspace path provided and MEDIAPLANPY_WORKSPACE_PATH environment variable not set"
+        error_msg += ". Please provide a workspace path or set the MEDIAPLANPY_WORKSPACE_PATH environment variable."
 
         return create_error_result(error_msg, error=str(e))
 
