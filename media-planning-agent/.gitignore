@@ -1,0 +1,166 @@
+# Media Planning Agent - Git Ignore File
+
+# =============================================================================
+# Environment and Secrets
+# =============================================================================
+.env
+.env.local
+.env.*.local
+*.key
+api_keys.txt
+
+# =============================================================================
+# Python
+# =============================================================================
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+cover/
+
+# Virtual environments
+.env/
+.venv/
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# =============================================================================
+# IDEs and Editors
+# =============================================================================
+# PyCharm
+.idea/
+
+# VS Code
+.vscode/
+*.code-workspace
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim
+*.swp
+*.swo
+*~
+
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+
+# =============================================================================
+# Operating System
+# =============================================================================
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+._*
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
+
+# =============================================================================
+# Logs and Temporary Files
+# =============================================================================
+*.log
+*.tmp
+*.temp
+*.bak
+*.backup
+
+# =============================================================================
+# MediaPlanPy Workspaces and Data
+# =============================================================================
+# Test workspaces (adjust as needed)
+test-workspace/
+workspace-test/
+*.workspace.json
+
+# Media plan data files
+media-plans/
+exports/
+imports/
+
+# =============================================================================
+# Development Tools
+# =============================================================================
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Black
+.black
+
+# isort
+.isort.cfg
+
+# pre-commit
+.pre-commit-config.yaml
+
+# =============================================================================
+# Documentation
+# =============================================================================
+docs/_build/
+site/
+
+# =============================================================================
+# Miscellaneous
+# =============================================================================
+*.pid
+*.seed
+*.pid.lock

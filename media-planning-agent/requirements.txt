@@ -1,0 +1,38 @@
+# Core dependencies for media-planning-agent
+# Install with: pip install -r requirements.txt
+
+# MediaPlanPy SDK - core functionality
+# mediaplanpy>=1.0.0
+
+# Data validation and modeling
+pydantic>=2.0.0
+
+# CLI interface
+click>=8.0.0
+
+# Environment variable management
+python-dotenv>=1.0.0
+
+# Rich console output and formatting
+rich>=13.0.0
+
+# Claude/Anthropic API client
+anthropic>=0.25.0
+
+# Optional: OpenAI support (uncomment if needed)
+# openai>=1.0.0
+
+# Development dependencies (optional)
+# Uncomment the section below for development work
+
+# Testing
+# pytest>=7.0.0
+# pytest-cov>=4.0.0
+
+# Code formatting and linting
+# black>=22.0.0
+# isort>=5.0.0
+# mypy>=1.0.0
+
+# Git hooks
+# pre-commit>=2.0.0
