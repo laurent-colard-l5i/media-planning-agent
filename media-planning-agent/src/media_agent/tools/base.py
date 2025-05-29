@@ -16,9 +16,10 @@ logger = logging.getLogger(__name__)
 class Tool(ABC):
     """Abstract base class for agent tools."""
 
-    def __init__(self, name: str, description: str):
+    def __init__(self, name: str, description: str, original_func: Optional[Callable] = None):
         self.name = name
         self.description = description
+        self.original_func = original_func  # Store reference to original function
 
     @abstractmethod
     def execute(self, session_state, **kwargs) -> Dict[str, Any]:
@@ -36,7 +37,10 @@ class Tool(ABC):
 
     def get_schema(self) -> Dict[str, Any]:
         """Get tool schema for Claude function calling (Anthropic format)."""
-        sig = inspect.signature(self.execute)
+        # Use original function signature if available, otherwise fall back to execute method
+        func_to_inspect = self.original_func if self.original_func else self.execute
+        sig = inspect.signature(func_to_inspect)
+
         properties = {}
         required = []
 
@@ -196,6 +200,9 @@ def register_tool(name: str, description: str, category: str = "general"):
     """Decorator to register a tool function."""
     def decorator(func: Callable) -> Callable:
         class FunctionTool(Tool):
+            def __init__(self):
+                super().__init__(name, description, original_func=func)  # Pass original function
+
             def execute(self, session_state, **kwargs):
                 try:
                     return func(session_state, **kwargs)
@@ -208,7 +215,7 @@ def register_tool(name: str, description: str, category: str = "general"):
                     }
 
         # Create and register the tool
-        tool = FunctionTool(name, description)
+        tool = FunctionTool()
         tool_registry.register(tool, category)
 
         # Log successful registration
