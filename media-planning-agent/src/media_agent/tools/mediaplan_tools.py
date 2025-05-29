@@ -17,23 +17,23 @@ from .base import register_tool, create_success_result, create_error_result
 
 logger = logging.getLogger(__name__)
 
-
 @register_tool(
     name="create_mediaplan_basic",
     description="Create a new media plan with basic campaign information. This creates the foundation campaign structure.",
     category="mediaplan"
 )
 def create_mediaplan_basic(
-        session_state,
-        campaign_name: str,
-        campaign_objective: str,
-        start_date: str,
-        end_date: str,
-        budget_total: float,
-        created_by: str,
-        product_name: Optional[str] = None,
-        product_description: Optional[str] = None,
-        target_audience_name: Optional[str] = None
+    session_state,
+    campaign_name: str,
+    campaign_objective: str,
+    start_date: str,
+    end_date: str,
+    budget_total: float,
+    created_by: str,
+    product_name: Optional[str] = None,
+    product_description: Optional[str] = None,
+    target_audience_name: Optional[str] = None,
+    **kwargs
 ) -> Dict[str, Any]:
     """
     Create a basic media plan with campaign information.
@@ -49,6 +49,7 @@ def create_mediaplan_basic(
         product_name: Product being advertised (optional)
         product_description: Product description (optional)
         target_audience_name: Target audience description (optional)
+        **kwargs: Additional arguments (ignored for compatibility)
 
     Returns:
         Success/error result with media plan information
@@ -151,17 +152,17 @@ def create_mediaplan_basic(
             error=str(e)
         )
 
-
 @register_tool(
     name="save_mediaplan",
     description="Save the current media plan to workspace storage with optional strategic summary.",
     category="mediaplan"
 )
 def save_mediaplan(
-        session_state,
-        include_strategic_summary: bool = True,
-        path: Optional[str] = None,
-        overwrite: bool = True
+    session_state,
+    include_strategic_summary: bool = True,
+    path: Optional[str] = None,
+    overwrite: bool = True,
+    **kwargs
 ) -> Dict[str, Any]:
     """
     Save the current media plan to workspace storage.
@@ -171,6 +172,7 @@ def save_mediaplan(
         include_strategic_summary: Whether to include strategic context in comments
         path: Optional custom path for saving
         overwrite: Whether to overwrite existing files
+        **kwargs: Additional arguments (ignored for compatibility)
 
     Returns:
         Success/error result with save information
@@ -232,16 +234,16 @@ def save_mediaplan(
             error=str(e)
         )
 
-
 @register_tool(
     name="load_mediaplan",
     description="Load an existing media plan from workspace by ID or path.",
     category="mediaplan"
 )
 def load_mediaplan(
-        session_state,
-        media_plan_id: Optional[str] = None,
-        path: Optional[str] = None
+    session_state,
+    media_plan_id: Optional[str] = None,
+    path: Optional[str] = None,
+    **kwargs
 ) -> Dict[str, Any]:
     """
     Load an existing media plan.
@@ -250,6 +252,7 @@ def load_mediaplan(
         session_state: Current session state
         media_plan_id: ID of the media plan to load (preferred)
         path: Path to media plan file (alternative to ID)
+        **kwargs: Additional arguments (ignored for compatibility)
 
     Returns:
         Success/error result with loaded media plan information
@@ -318,16 +321,16 @@ def load_mediaplan(
             error=str(e)
         )
 
-
 @register_tool(
     name="delete_mediaplan",
     description="Delete a media plan from workspace storage. Requires confirmation for safety.",
     category="mediaplan"
 )
 def delete_mediaplan(
-        session_state,
-        media_plan_id: str,
-        confirm_deletion: bool = False
+    session_state,
+    media_plan_id: str,
+    confirm_deletion: bool = False,
+    **kwargs
 ) -> Dict[str, Any]:
     """
     Delete a media plan by ID.
@@ -336,6 +339,7 @@ def delete_mediaplan(
         session_state: Current session state
         media_plan_id: ID of the media plan to delete
         confirm_deletion: Must be True to actually delete (safety check)
+        **kwargs: Additional arguments (ignored for compatibility)
 
     Returns:
         Success/error result with deletion information
@@ -375,7 +379,7 @@ def delete_mediaplan(
 
         # Clear from session if it was the current plan
         if (session_state.current_mediaplan and
-                session_state.current_mediaplan.meta.id == media_plan_id):
+            session_state.current_mediaplan.meta.id == media_plan_id):
             session_state.current_mediaplan = None
             logger.info("Cleared deleted media plan from session state")
 
@@ -402,22 +406,22 @@ def delete_mediaplan(
             error=str(e)
         )
 
-
 @register_tool(
     name="create_lineitem",
     description="Add a line item to the current media plan with specified parameters.",
     category="mediaplan"
 )
 def create_lineitem(
-        session_state,
-        name: str,
-        start_date: str,
-        end_date: str,
-        cost_total: float,
-        channel: Optional[str] = None,
-        vehicle: Optional[str] = None,
-        partner: Optional[str] = None,
-        kpi: Optional[str] = None
+    session_state,
+    name: str,
+    start_date: str,
+    end_date: str,
+    cost_total: float,
+    channel: Optional[str] = None,
+    vehicle: Optional[str] = None,
+    partner: Optional[str] = None,
+    kpi: Optional[str] = None,
+    **kwargs
 ) -> Dict[str, Any]:
     """
     Create and add a line item to the current media plan.
@@ -432,6 +436,7 @@ def create_lineitem(
         vehicle: Media vehicle (e.g., 'Facebook', 'Google')
         partner: Media partner/publisher
         kpi: Key performance indicator
+        **kwargs: Additional arguments (ignored for compatibility)
 
     Returns:
         Success/error result with line item information

@@ -15,19 +15,19 @@ from .base import register_tool, create_success_result, create_error_result
 
 logger = logging.getLogger(__name__)
 
-
 @register_tool(
     name="load_workspace",
     description="Load and validate a MediaPlanPy workspace configuration. This must be called before any media plan operations.",
     category="workspace"
 )
-def load_workspace(session_state, workspace_path: Optional[str] = None) -> Dict[str, Any]:
+def load_workspace(session_state, workspace_path: Optional[str] = None, **kwargs) -> Dict[str, Any]:
     """
     Load workspace configuration and store in session state.
 
     Args:
         session_state: Current session state
         workspace_path: Path to workspace.json file (optional, will use default locations if not provided)
+        **kwargs: Additional arguments (ignored for compatibility)
 
     Returns:
         Success/error result with workspace information
@@ -94,16 +94,16 @@ def load_workspace(session_state, workspace_path: Optional[str] = None) -> Dict[
             error=str(e)
         )
 
-
 @register_tool(
     name="list_mediaplans",
     description="List all media plans in the current workspace with optional statistics and filtering.",
     category="workspace"
 )
 def list_mediaplans(
-        session_state,
-        include_stats: bool = True,
-        limit: Optional[int] = None
+    session_state,
+    include_stats: bool = True,
+    limit: Optional[int] = None,
+    **kwargs
 ) -> Dict[str, Any]:
     """
     List media plans in the current workspace.
@@ -112,6 +112,7 @@ def list_mediaplans(
         session_state: Current session state
         include_stats: Whether to include statistics for each media plan
         limit: Maximum number of media plans to return (optional)
+        **kwargs: Additional arguments (ignored for compatibility)
 
     Returns:
         Success/error result with media plan list
@@ -182,18 +183,18 @@ def list_mediaplans(
             error=str(e)
         )
 
-
 @register_tool(
     name="validate_mediaplan",
     description="Validate the current media plan against schema and business rules.",
     category="workspace"
 )
-def validate_mediaplan(session_state) -> Dict[str, Any]:
+def validate_mediaplan(session_state, **kwargs) -> Dict[str, Any]:
     """
     Validate the current media plan in session state.
 
     Args:
         session_state: Current session state
+        **kwargs: Additional arguments (ignored for compatibility)
 
     Returns:
         Success/error result with validation details
@@ -240,18 +241,18 @@ def validate_mediaplan(session_state) -> Dict[str, Any]:
             error=str(e)
         )
 
-
 @register_tool(
     name="get_workspace_info",
     description="Get detailed information about the current workspace configuration and status.",
     category="workspace"
 )
-def get_workspace_info(session_state) -> Dict[str, Any]:
+def get_workspace_info(session_state, **kwargs) -> Dict[str, Any]:
     """
     Get comprehensive workspace information.
 
     Args:
         session_state: Current session state
+        **kwargs: Additional arguments (ignored for compatibility)
 
     Returns:
         Success/error result with workspace details
@@ -315,16 +316,16 @@ def get_workspace_info(session_state) -> Dict[str, Any]:
             error=str(e)
         )
 
-
 @register_tool(
     name="list_campaigns",
     description="List all campaigns across media plans in the workspace with statistics.",
     category="workspace"
 )
 def list_campaigns(
-        session_state,
-        include_stats: bool = True,
-        limit: Optional[int] = None
+    session_state,
+    include_stats: bool = True,
+    limit: Optional[int] = None,
+    **kwargs
 ) -> Dict[str, Any]:
     """
     List campaigns in the workspace.
@@ -333,6 +334,7 @@ def list_campaigns(
         session_state: Current session state
         include_stats: Whether to include campaign statistics
         limit: Maximum number of campaigns to return
+        **kwargs: Additional arguments (ignored for compatibility)
 
     Returns:
         Success/error result with campaign list
