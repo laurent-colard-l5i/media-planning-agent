@@ -13,7 +13,6 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-
 class Tool(ABC):
     """Abstract base class for agent tools."""
 
@@ -36,7 +35,7 @@ class Tool(ABC):
         pass
 
     def get_schema(self) -> Dict[str, Any]:
-        """Get tool schema for LLM function calling."""
+        """Get tool schema for Claude function calling (Anthropic format)."""
         sig = inspect.signature(self.execute)
         properties = {}
         required = []
@@ -58,10 +57,11 @@ class Tool(ABC):
             if param.default == inspect.Parameter.empty:
                 required.append(param_name)
 
+        # Return Claude-compatible format (uses "input_schema" not "parameters")
         return {
             "name": self.name,
             "description": self.description,
-            "parameters": {
+            "input_schema": {
                 "type": "object",
                 "properties": properties,
                 "required": required
@@ -102,7 +102,6 @@ class Tool(ABC):
         optional_str = "" if param.default == inspect.Parameter.empty else " (optional)"
 
         return f"Parameter {param_name}{type_str}{optional_str}"
-
 
 class ToolRegistry:
     """Registry for managing available tools."""
@@ -148,8 +147,18 @@ class ToolRegistry:
         return list(self._tool_categories.keys())
 
     def get_tool_schemas(self) -> List[Dict[str, Any]]:
-        """Get schemas for all tools for LLM function calling."""
-        return [tool.get_schema() for tool in self.tools.values()]
+        """Get schemas for all tools for Claude function calling."""
+        schemas = []
+        for tool in self.tools.values():
+            try:
+                schema = tool.get_schema()
+                schemas.append(schema)
+                logger.debug(f"Generated schema for tool '{tool.name}': {schema}")
+            except Exception as e:
+                logger.error(f"Failed to generate schema for tool '{tool.name}': {e}")
+                # Skip tools with invalid schemas rather than failing completely
+                continue
+        return schemas
 
     def get_tool_info(self) -> Dict[str, Any]:
         """Get comprehensive information about all registered tools."""
@@ -175,14 +184,11 @@ class ToolRegistry:
                 return category
         return "unknown"
 
-
 # Global tool registry instance
 tool_registry = ToolRegistry()
 
-
 def register_tool(name: str, description: str, category: str = "general"):
     """Decorator to register a tool function."""
-
     def decorator(func: Callable) -> Callable:
         class FunctionTool(Tool):
             def execute(self, session_state, **kwargs):
@@ -200,26 +206,25 @@ def register_tool(name: str, description: str, category: str = "general"):
         tool = FunctionTool(name, description)
         tool_registry.register(tool, category)
 
+        # Log successful registration
+        logger.info(f"Registered tool: {name}")
+
         # Return the original function (for potential direct use)
         return func
 
     return decorator
 
-
 def get_tool_registry() -> ToolRegistry:
     """Get the global tool registry."""
     return tool_registry
-
 
 class ToolExecutionError(Exception):
     """Exception raised when tool execution fails."""
     pass
 
-
 class ToolNotFoundError(Exception):
     """Exception raised when requested tool is not found."""
     pass
-
 
 def execute_tool(tool_name: str, session_state, **kwargs) -> Dict[str, Any]:
     """
@@ -247,7 +252,6 @@ def execute_tool(tool_name: str, session_state, **kwargs) -> Dict[str, Any]:
         logger.error(f"Failed to execute tool '{tool_name}': {e}")
         raise ToolExecutionError(f"Tool execution failed: {str(e)}") from e
 
-
 # Utility functions for tool development
 def validate_tool_result(result: Dict[str, Any]) -> bool:
     """Validate that a tool result has the expected structure."""
@@ -268,7 +272,6 @@ def validate_tool_result(result: Dict[str, Any]) -> bool:
 
     return True
 
-
 def create_success_result(message: str, **extra_data) -> Dict[str, Any]:
     """Helper to create a standardized success result."""
     result = {
@@ -277,7 +280,6 @@ def create_success_result(message: str, **extra_data) -> Dict[str, Any]:
     }
     result.update(extra_data)
     return result
-
 
 def create_error_result(message: str, error: Optional[str] = None, **extra_data) -> Dict[str, Any]:
     """Helper to create a standardized error result."""

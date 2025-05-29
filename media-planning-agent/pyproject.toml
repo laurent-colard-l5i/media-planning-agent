@@ -25,7 +25,7 @@ classifiers = [
 
 # Core dependencies required for basic functionality
 dependencies = [
-    "mediaplanpy>=1.0.0",
+    "mediaplanpy @ file:///C:/Users/laure/PycharmProjects/mediaplanpy",
     "pydantic>=2.0.0",
     "click>=8.0.0",
     "python-dotenv>=1.0.0",
