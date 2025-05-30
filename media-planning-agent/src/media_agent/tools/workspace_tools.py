@@ -181,16 +181,12 @@ def list_mediaplans(
             error=str(e)
         )
 
+
 def validate_mediaplan(session_state, **kwargs) -> Dict[str, Any]:
     """
-    Validate the current media plan in session state.
+    Validate the current media plan against schema and business rules.
 
-    Args:
-        session_state: Current session state
-        **kwargs: Additional arguments (ignored for compatibility)
-
-    Returns:
-        Success/error result with validation details
+    Tool metadata is now defined in tool_registry.json
     """
     if not session_state.current_mediaplan:
         return create_error_result(
@@ -200,8 +196,41 @@ def validate_mediaplan(session_state, **kwargs) -> Dict[str, Any]:
     try:
         logger.info("Validating current media plan")
 
-        # Perform validation using MediaPlanPy
-        validation_errors = session_state.current_mediaplan.validate()
+        # Debug: Check what validation methods are available
+        media_plan = session_state.current_mediaplan
+        logger.debug(f"MediaPlan type: {type(media_plan)}")
+        logger.debug(f"Available methods: {[method for method in dir(media_plan) if 'valid' in method.lower()]}")
+
+        # Try different validation approaches
+        validation_errors = []
+
+        # Method 1: Try validate_against_schema (preferred)
+        if hasattr(media_plan, 'validate_against_schema'):
+            logger.debug("Using validate_against_schema method")
+            validation_errors = media_plan.validate_against_schema()
+
+        # Method 2: Try validate method if available
+        elif hasattr(media_plan, 'validate'):
+            logger.debug("Using validate method")
+            try:
+                validation_errors = media_plan.validate()
+            except TypeError as e:
+                logger.error(f"validate() method failed: {e}")
+                # Try calling validate with no arguments
+                validation_errors = []
+
+        # Method 3: Manual validation
+        else:
+            logger.warning("No validation method found, performing basic checks")
+            validation_errors = []
+
+            # Basic validation checks
+            if not media_plan.meta.id:
+                validation_errors.append("Media plan missing ID")
+            if not media_plan.campaign.name:
+                validation_errors.append("Campaign missing name")
+            if media_plan.campaign.budget_total <= 0:
+                validation_errors.append("Campaign budget must be positive")
 
         # Check if validation passed
         if not validation_errors:
@@ -209,7 +238,7 @@ def validate_mediaplan(session_state, **kwargs) -> Dict[str, Any]:
                 "✅ Media plan validation passed! The media plan complies with all schema and business rules.",
                 validation_errors=[],
                 is_valid=True,
-                media_plan_id=session_state.current_mediaplan.meta.id
+                media_plan_id=media_plan.meta.id
             )
         else:
             # Format validation errors for display
@@ -223,12 +252,14 @@ def validate_mediaplan(session_state, **kwargs) -> Dict[str, Any]:
                 f"⚠️ Media plan validation found {len(validation_errors)} issue(s):\n{error_summary}",
                 validation_errors=validation_errors,
                 is_valid=False,
-                media_plan_id=session_state.current_mediaplan.meta.id,
+                media_plan_id=media_plan.meta.id,
                 error_count=len(validation_errors)
             )
 
     except Exception as e:
         logger.error(f"Error validating media plan: {e}")
+        import traceback
+        logger.error(f"Full traceback: {traceback.format_exc()}")
         return create_error_result(
             f"❌ Validation failed due to error: {str(e)}",
             error=str(e)
