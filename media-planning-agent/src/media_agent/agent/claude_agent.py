@@ -24,6 +24,31 @@ from ..tools.base import get_tool_registry
 
 logger = logging.getLogger(__name__)
 
+def safe_log_text(text: str, max_length: int = 100) -> str:
+    """
+    Safely log text by removing problematic Unicode characters for Windows console.
+
+    Args:
+        text: Text to log
+        max_length: Maximum length to log
+
+    Returns:
+        Safe text for logging
+    """
+    try:
+        # Try to encode with cp1252 to test compatibility
+        safe_text = text[:max_length]
+        safe_text.encode('cp1252')
+        return safe_text + ("..." if len(text) > max_length else "")
+    except UnicodeEncodeError:
+        # Remove or replace problematic characters
+        safe_text = text[:max_length].encode('cp1252', errors='replace').decode('cp1252')
+        return safe_text + ("..." if len(text) > max_length else "")
+    except Exception:
+        # Fallback: ASCII only
+        safe_text = ''.join(c if ord(c) < 128 else '?' for c in text[:max_length])
+        return safe_text + ("..." if len(text) > max_length else "")
+
 class CustomJSONEncoder(json.JSONEncoder):
     """Custom JSON encoder that handles date, datetime, and Decimal objects."""
 
@@ -184,7 +209,7 @@ Never summarize tool results - show the actual data returned."""
 
                 if content_block.type == "text":
                     response_text += content_block.text
-                    logger.debug(f"Added text content: {content_block.text[:100]}...")
+                    logger.debug(f"Added text content: {safe_log_text(content_block.text)}")
 
                 elif content_block.type == "tool_use":
                     logger.debug(f"Executing tool: {content_block.name}")
@@ -249,7 +274,7 @@ Never summarize tool results - show the actual data returned."""
                     logger.debug(f"Processing follow-up content block {i}: type={content_block.type}")
                     if content_block.type == "text":
                         follow_up_text += content_block.text
-                        logger.debug(f"Added follow-up text: {content_block.text[:100]}...")
+                        logger.debug(f"Added follow-up text: {safe_log_text(content_block.text)}")
 
                 response_text = follow_up_text
 
