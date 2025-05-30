@@ -1,0 +1,234 @@
+{
+  "registry_metadata": {
+    "version": "1.0.0",
+    "last_updated": "2025-05-30",
+    "description": "Media Planning Agent Tool Registry - Proof of Concept"
+  },
+
+  "tool_registry": {
+    "workspace_tools": {
+      "load_workspace": {
+        "function_name": "load_workspace",
+        "module_path": "media_agent.tools.workspace_tools",
+        "category": "workspace",
+        "priority": 1,
+        "description": "Load and validate MediaPlanPy workspace configuration. Required before any media plan operations.",
+
+        "triggers": {
+          "user_intents": [
+            "load workspace",
+            "load my workspace",
+            "start session",
+            "initialize workspace"
+          ],
+          "prerequisites": []
+        },
+
+        "parameters": {
+          "workspace_path": {
+            "type": "string",
+            "required": false,
+            "description": "Path to workspace.json file. Uses environment variable or default locations if not provided.",
+            "examples": ["./workspace.json", "C:/mediaplanpy/workspace_settings.json"]
+          }
+        },
+
+        "success_criteria": {
+          "returns": ["workspace_info", "config_summary"],
+          "session_state": "workspace_manager_loaded",
+          "enables_operations": ["list_mediaplans", "create_mediaplan_basic"]
+        },
+
+        "common_errors": {
+          "file_not_found": "Workspace configuration file not found at specified path",
+          "invalid_config": "Workspace configuration failed validation",
+          "database_connection": "Database connection failed (non-critical)"
+        }
+      },
+
+      "list_mediaplans": {
+        "function_name": "list_mediaplans",
+        "module_path": "media_agent.tools.workspace_tools",
+        "category": "workspace",
+        "priority": 2,
+        "description": "List all media plans in workspace with detailed information and statistics.",
+
+        "triggers": {
+          "user_intents": [
+            "list media plans",
+            "show media plans",
+            "what media plans do I have",
+            "see existing plans",
+            "1"
+          ],
+          "prerequisites": ["workspace_loaded"],
+          "auto_call_after": ["delete_mediaplan"]
+        },
+
+        "parameters": {
+          "include_stats": {
+            "type": "boolean",
+            "required": false,
+            "default": true,
+            "description": "Include line item counts and budget allocation statistics"
+          },
+          "limit": {
+            "type": "integer",
+            "required": false,
+            "description": "Maximum number of media plans to return",
+            "examples": [5, 10, 20]
+          }
+        },
+
+        "success_criteria": {
+          "returns": ["media_plans", "count"],
+          "data_includes": [
+            "media_plan_id",
+            "campaign_name",
+            "campaign_objective",
+            "budget_total",
+            "start_date",
+            "end_date",
+            "created_by",
+            "created_at",
+            "lineitem_count",
+            "total_cost"
+          ]
+        },
+
+        "display_requirements": {
+          "show_individual_plans": true,
+          "never_summarize": true,
+          "always_include": ["media_plan_id", "exact_dates", "precise_budgets"],
+          "format_structured": true
+        },
+
+        "validation_rules": {
+          "requires_workspace": true,
+          "empty_list_ok": true,
+          "preserve_all_details": true
+        }
+      }
+    },
+
+    "mediaplan_tools": {
+      "create_mediaplan_basic": {
+        "function_name": "create_mediaplan_basic",
+        "module_path": "media_agent.tools.mediaplan_tools",
+        "category": "mediaplan",
+        "priority": 1,
+        "description": "Create new media plan foundation. Requires strategic consultation first.",
+
+        "triggers": {
+          "user_intents": [
+            "create media plan",
+            "new media plan",
+            "create campaign",
+            "start planning"
+          ],
+          "prerequisites": ["workspace_loaded", "strategic_consultation_completed"]
+        },
+
+        "parameters": {
+          "campaign_name": {
+            "type": "string",
+            "required": true,
+            "validation": "non_empty_string",
+            "examples": ["Summer 2025 Launch", "Q4 Brand Awareness", "Product Launch Campaign"]
+          },
+          "campaign_objective": {
+            "type": "string",
+            "required": true,
+            "enum": ["awareness", "consideration", "conversion", "retention", "loyalty", "other"],
+            "examples": ["awareness", "conversion"]
+          },
+          "start_date": {
+            "type": "string",
+            "required": true,
+            "format": "YYYY-MM-DD",
+            "validation": "future_or_today"
+          },
+          "end_date": {
+            "type": "string",
+            "required": true,
+            "format": "YYYY-MM-DD",
+            "validation": "after_start_date"
+          },
+          "budget_total": {
+            "type": "number",
+            "required": true,
+            "validation": "positive_number",
+            "typical_ranges": [1000, 10000, 50000, 100000, 500000]
+          },
+          "created_by": {
+            "type": "string",
+            "required": true,
+            "format": "email",
+            "description": "Email address of plan creator"
+          }
+        },
+
+        "success_criteria": {
+          "returns": ["campaign_info", "media_plan_id"],
+          "session_state": "current_mediaplan_set",
+          "enables_operations": ["create_lineitem", "save_mediaplan", "validate_mediaplan"]
+        }
+      },
+
+      "delete_mediaplan": {
+        "function_name": "delete_mediaplan",
+        "module_path": "media_agent.tools.mediaplan_tools",
+        "category": "mediaplan",
+        "priority": 3,
+        "description": "Delete media plan by ID. Requires explicit confirmation for safety.",
+
+        "triggers": {
+          "user_intents": [
+            "delete media plan",
+            "remove plan",
+            "delete plan [id]",
+            "remove [id]"
+          ],
+          "prerequisites": ["workspace_loaded"]
+        },
+
+        "parameters": {
+          "media_plan_id": {
+            "type": "string",
+            "required": true,
+            "description": "Unique identifier of media plan to delete",
+            "examples": ["mediaplan_abc123", "mediaplan_def456"]
+          },
+          "confirm_deletion": {
+            "type": "boolean",
+            "required": true,
+            "description": "Must be true to confirm deletion. Safety mechanism.",
+            "safety_critical": true
+          }
+        },
+
+        "safety_requirements": {
+          "confirmation_required": true,
+          "show_details_before_delete": true,
+          "irreversible_operation": true
+        },
+
+        "success_criteria": {
+          "returns": ["deletion_info", "deleted_files"],
+          "triggers_follow_up": ["list_mediaplans"]
+        }
+      }
+    }
+  },
+
+  "categories": {
+    "workspace": {
+      "description": "Tools for workspace configuration and data exploration",
+      "priority": 1
+    },
+    "mediaplan": {
+      "description": "Tools for media plan creation, modification, and management",
+      "priority": 2
+    }
+  }
+}

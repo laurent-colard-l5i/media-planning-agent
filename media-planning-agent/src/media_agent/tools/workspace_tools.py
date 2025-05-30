@@ -15,11 +15,6 @@ from .base import register_tool, create_success_result, create_error_result
 
 logger = logging.getLogger(__name__)
 
-@register_tool(
-    name="load_workspace",
-    description="Load and validate a MediaPlanPy workspace configuration. This must be called before any media plan operations.",
-    category="workspace"
-)
 def load_workspace(session_state, workspace_path: Optional[str] = None, **kwargs) -> Dict[str, Any]:
     """
     Load workspace configuration and store in session state.
@@ -102,11 +97,6 @@ def load_workspace(session_state, workspace_path: Optional[str] = None, **kwargs
             error=str(e)
         )
 
-@register_tool(
-    name="list_mediaplans",
-    description="List all media plans in the current workspace with optional statistics and filtering.",
-    category="workspace"
-)
 def list_mediaplans(
     session_state,
     include_stats: bool = True,

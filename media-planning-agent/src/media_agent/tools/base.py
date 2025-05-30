@@ -226,9 +226,27 @@ def register_tool(name: str, description: str, category: str = "general"):
 
     return decorator
 
-def get_tool_registry() -> ToolRegistry:
-    """Get the global tool registry."""
-    return tool_registry
+def get_tool_registry(use_json: bool = True, json_path: Optional[str] = None):
+    """
+    Get tool registry - supports both JSON and decorator approaches.
+
+    Args:
+        use_json: If True, use JSON registry. If False, use decorator registry.
+        json_path: Path to JSON registry file (optional)
+
+    Returns:
+        Tool registry instance
+    """
+    if use_json:
+        try:
+            from ..agent.json_registry import get_json_tool_registry
+            return get_json_tool_registry(json_path)
+        except Exception as e:
+            logger.warning(f"Failed to load JSON registry: {e}")
+            logger.info("Falling back to decorator-based registry")
+
+    # Fallback to original decorator-based registry
+    return tool_registry  # Your existing global registry
 
 class ToolExecutionError(Exception):
     """Exception raised when tool execution fails."""

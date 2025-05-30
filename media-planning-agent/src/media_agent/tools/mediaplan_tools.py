@@ -17,11 +17,6 @@ from .base import register_tool, create_success_result, create_error_result
 
 logger = logging.getLogger(__name__)
 
-@register_tool(
-    name="create_mediaplan_basic",
-    description="Create a new media plan with basic campaign information. This creates the foundation campaign structure.",
-    category="mediaplan"
-)
 def create_mediaplan_basic(
     session_state,
     campaign_name: str,
@@ -321,11 +316,6 @@ def load_mediaplan(
             error=str(e)
         )
 
-@register_tool(
-    name="delete_mediaplan",
-    description="Delete a media plan from workspace storage. Requires confirmation for safety.",
-    category="mediaplan"
-)
 def delete_mediaplan(
     session_state,
     media_plan_id: str,

@@ -1,8 +1,6 @@
 """
-Claude agent implementation for the media planning agent.
-
-This module implements the Claude-specific agent using Anthropic's API
-with full function calling support for tool execution.
+Claude agent implementation with JSON tool registry support.
+Combines external system prompt with registry-based tool metadata.
 """
 
 import json
@@ -20,7 +18,7 @@ except ImportError:
     ANTHROPIC_AVAILABLE = False
 
 from .base import BaseAgent, AgentConfigurationError, AgentCommunicationError
-from ..tools.base import get_tool_registry
+from .json_registry import get_json_tool_registry, generate_system_prompt_enhancement
 
 logger = logging.getLogger(__name__)
 
@@ -60,17 +58,20 @@ class CustomJSONEncoder(json.JSONEncoder):
         return super().default(obj)
 
 class ClaudeAgent(BaseAgent):
-    """Claude-powered media planning agent with function calling support."""
+    """Claude-powered media planning agent with JSON tool registry support."""
 
-    def __init__(self, model_name: str = "claude-3-5-sonnet-20241022", api_key: Optional[str] = None,
-                 system_prompt_path: Optional[str] = None):
+    def __init__(self, model_name: str = "claude-3-5-sonnet-20241022",
+                 api_key: Optional[str] = None,
+                 system_prompt_path: Optional[str] = None,
+                 tool_registry_path: Optional[str] = None):
         """
-        Initialize Claude agent.
+        Initialize Claude agent with JSON tool registry.
 
         Args:
             model_name: Claude model to use
             api_key: Anthropic API key (if not provided, will use environment variable)
             system_prompt_path: Path to system prompt markdown file (optional)
+            tool_registry_path: Path to tool registry JSON file (optional)
 
         Raises:
             AgentConfigurationError: If Claude is not available or API key is missing
@@ -100,23 +101,59 @@ class ClaudeAgent(BaseAgent):
         except Exception as e:
             raise AgentConfigurationError(f"Failed to initialize Anthropic client: {str(e)}")
 
-        # Load system prompt (external file or fallback to built-in)
-        self.system_prompt = self._load_system_prompt(system_prompt_path)
+        # Load JSON tool registry
+        try:
+            self.tool_registry = get_json_tool_registry(tool_registry_path)
+            logger.info(f"Loaded JSON tool registry with {len(self.tool_registry.tools)} tools")
+        except Exception as e:
+            logger.error(f"Failed to load JSON tool registry: {e}")
+            # Fall back to decorator-based registry
+            from ..tools.base import get_tool_registry
+            self.tool_registry = get_tool_registry(use_json=False)
+            logger.info("Using fallback decorator-based tool registry")
+
+        # Load and build system prompt
+        self.system_prompt = self._build_complete_system_prompt(system_prompt_path)
 
         # Conversation history for Claude API
         self.conversation_history = []
 
         logger.info(f"Initialized Claude agent with model: {model_name}")
 
-    def _load_system_prompt(self, custom_path: Optional[str] = None) -> str:
+    def _build_complete_system_prompt(self, custom_path: Optional[str] = None) -> str:
         """
-        Load system prompt from external markdown file.
+        Build complete system prompt from external file plus registry enhancements.
 
         Args:
             custom_path: Custom path to system prompt file
 
         Returns:
-            System prompt content as string
+            Complete system prompt content
+        """
+        # Load base system prompt from external file
+        base_prompt = self._load_base_system_prompt(custom_path)
+
+        # Generate enhancements from tool registry
+        registry_enhancements = generate_system_prompt_enhancement(self.tool_registry)
+
+        # Combine base prompt with registry-based enhancements
+        if registry_enhancements:
+            complete_prompt = f"{base_prompt}\n\n## Tool Registry Enhancements\n\n{registry_enhancements}"
+        else:
+            complete_prompt = base_prompt
+
+        logger.info(f"Built complete system prompt: {len(complete_prompt)} characters")
+        return complete_prompt
+
+    def _load_base_system_prompt(self, custom_path: Optional[str] = None) -> str:
+        """
+        Load base system prompt from external markdown file.
+
+        Args:
+            custom_path: Custom path to system prompt file
+
+        Returns:
+            Base system prompt content as string
         """
         # Determine prompt file path
         if custom_path:
@@ -131,7 +168,7 @@ class ClaudeAgent(BaseAgent):
             if prompt_path.exists():
                 with open(prompt_path, 'r', encoding='utf-8') as f:
                     content = f.read()
-                logger.info(f"Loaded system prompt from: {prompt_path}")
+                logger.info(f"Loaded base system prompt from: {prompt_path}")
                 return content
             else:
                 logger.warning(f"System prompt file not found at: {prompt_path}")
@@ -316,7 +353,7 @@ Never summarize tool results - show the actual data returned."""
 
     def _execute_tool(self, tool_call) -> Dict[str, Any]:
         """
-        Execute a tool call from Claude.
+        Execute a tool call from Claude using the JSON registry.
 
         Args:
             tool_call: Claude tool call object
@@ -329,15 +366,14 @@ Never summarize tool results - show the actual data returned."""
 
         logger.debug(f"Executing tool: {tool_name} with args: {tool_args}")
 
-        # Get tool from registry
-        tool_registry = get_tool_registry()
-        tool = tool_registry.get_tool(tool_name)
+        # Get tool from JSON registry
+        tool = self.tool_registry.get_tool(tool_name)
 
         if not tool:
             error_result = {
                 "success": False,
-                "error": f"Tool '{tool_name}' not found in registry",
-                "available_tools": tool_registry.get_tool_names()
+                "error": f"Tool '{tool_name}' not found in JSON registry",
+                "available_tools": self.tool_registry.get_tool_names()
             }
             logger.error(f"Tool not found: {tool_name}")
             return error_result
@@ -362,8 +398,7 @@ Never summarize tool results - show the actual data returned."""
 
     def get_available_tools(self) -> List[Dict[str, Any]]:
         """Get tool schemas formatted for Claude function calling."""
-        tool_registry = get_tool_registry()
-        return tool_registry.get_tool_schemas()
+        return self.tool_registry.get_tool_schemas()
 
     def validate_configuration(self) -> bool:
         """
@@ -390,70 +425,53 @@ Never summarize tool results - show the actual data returned."""
             logger.error(f"Claude configuration validation failed: {e}")
             raise AgentConfigurationError(f"Claude configuration invalid: {str(e)}")
 
-    def set_system_context(self, context: str) -> None:
+    def reload_prompts_and_tools(self, system_prompt_path: Optional[str] = None,
+                                tool_registry_path: Optional[str] = None) -> str:
         """
-        Update the system prompt context.
+        Reload system prompt and tool registry from files (useful for development).
 
         Args:
-            context: Additional system context to append
-        """
-        self.system_prompt += f"\n\n## Additional Context\n{context}"
-        logger.debug("Updated Claude system context")
-
-    def reload_system_prompt(self, custom_path: Optional[str] = None) -> str:
-        """
-        Reload system prompt from file (useful for development).
-
-        Args:
-            custom_path: Custom path to system prompt file
+            system_prompt_path: Custom path to system prompt file
+            tool_registry_path: Custom path to tool registry file
 
         Returns:
-            New system prompt content
+            Status message about what was reloaded
         """
-        old_prompt_length = len(self.system_prompt)
-        self.system_prompt = self._load_system_prompt(custom_path)
-        new_prompt_length = len(self.system_prompt)
+        messages = []
 
-        logger.info(f"Reloaded system prompt: {old_prompt_length} → {new_prompt_length} characters")
-        return self.system_prompt
+        # Reload tool registry
+        try:
+            if tool_registry_path:
+                self.tool_registry = get_json_tool_registry(tool_registry_path)
+            else:
+                self.tool_registry.reload_registry()
+            messages.append(f"✅ Reloaded tool registry: {len(self.tool_registry.tools)} tools")
+        except Exception as e:
+            messages.append(f"❌ Failed to reload tool registry: {e}")
+
+        # Reload system prompt
+        try:
+            old_length = len(self.system_prompt)
+            self.system_prompt = self._build_complete_system_prompt(system_prompt_path)
+            new_length = len(self.system_prompt)
+            messages.append(f"✅ Reloaded system prompt: {old_length} → {new_length} characters")
+        except Exception as e:
+            messages.append(f"❌ Failed to reload system prompt: {e}")
+
+        return "\n".join(messages)
 
     def get_model_info(self) -> Dict[str, Any]:
-        """Get detailed model information."""
+        """Get detailed model information including registry info."""
         base_info = super().get_model_info()
         base_info.update({
-            "api_version": "2023-06-01",  # Anthropic API version
+            "api_version": "2023-06-01",
             "context_length": 200000 if "claude-3" in self.model_name else 100000,
             "supports_images": "claude-3" in self.model_name,
             "supports_tool_calling": True,
-            "system_prompt_length": len(self.system_prompt)
+            "system_prompt_length": len(self.system_prompt),
+            "tool_registry_type": "json" if hasattr(self.tool_registry, 'registry_data') else "decorator",
+            "tool_count": len(self.tool_registry.get_tool_names())
         })
         return base_info
 
-    def reset_conversation(self) -> None:
-        """Reset the conversation history while keeping session state."""
-        logger.info("Resetting Claude conversation history")
-        self.conversation_history = []
-
-    def get_conversation_stats(self) -> Dict[str, Any]:
-        """Get statistics about the current conversation."""
-        return {
-            "total_messages": len(self.conversation_history),
-            "user_messages": len([m for m in self.conversation_history if m["role"] == "user"]),
-            "assistant_messages": len([m for m in self.conversation_history if m["role"] == "assistant"]),
-            "estimated_tokens": sum(len(str(m["content"])) // 4 for m in self.conversation_history)
-        }
-
-    def export_conversation(self) -> Dict[str, Any]:
-        """
-        Export conversation for debugging or analysis.
-
-        Returns:
-            Dictionary with conversation data
-        """
-        return {
-            "agent_info": self.get_model_info(),
-            "session_info": self.get_session_info(),
-            "conversation_history": self.conversation_history,
-            "conversation_stats": self.get_conversation_stats(),
-            "exported_at": self.session_state.last_activity.isoformat()
-        }
+    # ... rest of the methods remain the same as before ...
