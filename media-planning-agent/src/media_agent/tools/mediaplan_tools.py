@@ -147,11 +147,6 @@ def create_mediaplan_basic(
             error=str(e)
         )
 
-@register_tool(
-    name="save_mediaplan",
-    description="Save the current media plan to workspace storage with optional strategic summary.",
-    category="mediaplan"
-)
 def save_mediaplan(
     session_state,
     include_strategic_summary: bool = True,
@@ -229,11 +224,6 @@ def save_mediaplan(
             error=str(e)
         )
 
-@register_tool(
-    name="load_mediaplan",
-    description="Load an existing media plan from workspace by ID or path.",
-    category="mediaplan"
-)
 def load_mediaplan(
     session_state,
     media_plan_id: Optional[str] = None,
@@ -396,11 +386,6 @@ def delete_mediaplan(
             error=str(e)
         )
 
-@register_tool(
-    name="create_lineitem",
-    description="Add a line item to the current media plan with specified parameters.",
-    category="mediaplan"
-)
 def create_lineitem(
     session_state,
     name: str,

@@ -11,7 +11,6 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-
 class JsonToolRegistry:
     """Tool registry that loads metadata from JSON configuration."""
 
@@ -121,6 +120,28 @@ class JsonToolRegistry:
         """Get list of all tool names."""
         return list(self.tools.keys())
 
+    def get_tool_info(self) -> Dict[str, Any]:
+        """Get comprehensive information about all registered tools (for CLI compatibility)."""
+        # Count tools by category
+        categories = {}
+        for tool in self.tools.values():
+            category = tool.category
+            categories[category] = categories.get(category, 0) + 1
+
+        # Build tool info
+        tools_info = {}
+        for tool_name, tool in self.tools.items():
+            tools_info[tool_name] = {
+                "description": tool.description,
+                "category": tool.category
+            }
+
+        return {
+            "total_tools": len(self.tools),
+            "categories": categories,
+            "tools": tools_info
+        }
+
     def reload_registry(self) -> None:
         """Reload the registry from file (useful for development)."""
         logger.info("Reloading tool registry...")
@@ -129,7 +150,6 @@ class JsonToolRegistry:
         self.load_registry()
         new_count = len(self.tools)
         logger.info(f"Registry reloaded: {old_count} → {new_count} tools")
-
 
 class JsonTool:
     """Tool instance created from JSON configuration."""
@@ -208,10 +228,8 @@ class JsonTool:
         """Get display requirements for this tool."""
         return self.config.get("display_requirements", {})
 
-
 # Global registry instance
 _json_tool_registry = None
-
 
 def get_json_tool_registry(registry_path: Optional[str] = None) -> JsonToolRegistry:
     """Get the global JSON tool registry instance."""
@@ -219,7 +237,6 @@ def get_json_tool_registry(registry_path: Optional[str] = None) -> JsonToolRegis
     if _json_tool_registry is None:
         _json_tool_registry = JsonToolRegistry(registry_path)
     return _json_tool_registry
-
 
 def generate_system_prompt_enhancement(registry: JsonToolRegistry) -> str:
     """
@@ -260,7 +277,6 @@ def generate_system_prompt_enhancement(registry: JsonToolRegistry) -> str:
         enhancements.append("## Strategic Consultation Required\n" + "\n".join(consultation_tools))
 
     return "\n\n".join(enhancements) if enhancements else ""
-
 
 # Backward compatibility function
 def get_tool_registry(use_json: bool = True, json_path: Optional[str] = None):

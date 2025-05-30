@@ -2,7 +2,7 @@
   "registry_metadata": {
     "version": "1.0.0",
     "last_updated": "2025-05-30",
-    "description": "Media Planning Agent Tool Registry - Proof of Concept"
+    "description": "Complete Media Planning Agent Tool Registry - All Tools Migrated"
   },
 
   "tool_registry": {
@@ -101,12 +101,93 @@
           "never_summarize": true,
           "always_include": ["media_plan_id", "exact_dates", "precise_budgets"],
           "format_structured": true
+        }
+      },
+
+      "validate_mediaplan": {
+        "function_name": "validate_mediaplan",
+        "module_path": "media_agent.tools.workspace_tools",
+        "category": "workspace",
+        "priority": 3,
+        "description": "Validate the current media plan against schema and business rules.",
+
+        "triggers": {
+          "user_intents": [
+            "validate media plan",
+            "validate plan",
+            "check plan",
+            "validate current plan"
+          ],
+          "prerequisites": ["workspace_loaded", "current_mediaplan_exists"]
         },
 
-        "validation_rules": {
-          "requires_workspace": true,
-          "empty_list_ok": true,
-          "preserve_all_details": true
+        "parameters": {},
+
+        "success_criteria": {
+          "returns": ["validation_errors", "is_valid"],
+          "validation_types": ["schema_validation", "business_rules", "cross_field_validation"]
+        }
+      },
+
+      "get_workspace_info": {
+        "function_name": "get_workspace_info",
+        "module_path": "media_agent.tools.workspace_tools",
+        "category": "workspace",
+        "priority": 4,
+        "description": "Get detailed information about current workspace configuration and status.",
+
+        "triggers": {
+          "user_intents": [
+            "workspace info",
+            "show workspace details",
+            "workspace configuration",
+            "workspace status"
+          ],
+          "prerequisites": ["workspace_loaded"]
+        },
+
+        "parameters": {},
+
+        "success_criteria": {
+          "returns": ["workspace_details", "config"],
+          "data_includes": ["storage_mode", "database_config", "schema_settings"]
+        }
+      },
+
+      "list_campaigns": {
+        "function_name": "list_campaigns",
+        "module_path": "media_agent.tools.workspace_tools",
+        "category": "workspace",
+        "priority": 5,
+        "description": "List all campaigns across media plans in workspace with statistics.",
+
+        "triggers": {
+          "user_intents": [
+            "list campaigns",
+            "show campaigns",
+            "what campaigns do I have",
+            "campaign overview"
+          ],
+          "prerequisites": ["workspace_loaded"]
+        },
+
+        "parameters": {
+          "include_stats": {
+            "type": "boolean",
+            "required": false,
+            "default": true,
+            "description": "Include campaign statistics and metrics"
+          },
+          "limit": {
+            "type": "integer",
+            "required": false,
+            "description": "Maximum number of campaigns to return"
+          }
+        },
+
+        "success_criteria": {
+          "returns": ["campaigns", "count"],
+          "data_includes": ["campaign_info", "budget_stats", "performance_metrics"]
         }
       }
     },
@@ -127,6 +208,23 @@
             "start planning"
           ],
           "prerequisites": ["workspace_loaded", "strategic_consultation_completed"]
+        },
+
+        "consultation_required": {
+          "strategic_questions": [
+            "What are your primary business objectives for this campaign?",
+            "Who is your target audience (demographics, interests, behaviors)?",
+            "What is your total budget and any allocation preferences?",
+            "When do you need the campaign to run (start and end dates)?",
+            "Are there any channel preferences or constraints?",
+            "How will you measure success (KPIs, success metrics)?"
+          ],
+          "budget_guidance": {
+            "awareness": {"social": 30, "display": 25, "video": 25, "search": 15, "buffer": 5},
+            "consideration": {"search": 35, "social": 30, "content": 20, "display": 15},
+            "conversion": {"search": 40, "social_retargeting": 25, "email": 20, "display": 15},
+            "retention": {"email": 40, "social": 25, "search": 20, "direct": 15}
+          }
         },
 
         "parameters": {
@@ -165,6 +263,21 @@
             "required": true,
             "format": "email",
             "description": "Email address of plan creator"
+          },
+          "product_name": {
+            "type": "string",
+            "required": false,
+            "description": "Product or service being advertised"
+          },
+          "product_description": {
+            "type": "string",
+            "required": false,
+            "description": "Brief description of the product or service"
+          },
+          "target_audience_name": {
+            "type": "string",
+            "required": false,
+            "description": "Name or description of target audience segment"
           }
         },
 
@@ -175,11 +288,98 @@
         }
       },
 
+      "save_mediaplan": {
+        "function_name": "save_mediaplan",
+        "module_path": "media_agent.tools.mediaplan_tools",
+        "category": "mediaplan",
+        "priority": 2,
+        "description": "Save current media plan to workspace storage with optional strategic summary.",
+
+        "triggers": {
+          "user_intents": [
+            "save media plan",
+            "save plan",
+            "save current plan",
+            "save the plan"
+          ],
+          "prerequisites": ["workspace_loaded", "current_mediaplan_exists"]
+        },
+
+        "parameters": {
+          "include_strategic_summary": {
+            "type": "boolean",
+            "required": false,
+            "default": true,
+            "description": "Whether to include strategic context in comments field"
+          },
+          "path": {
+            "type": "string",
+            "required": false,
+            "description": "Optional custom path for saving (uses default if not provided)"
+          },
+          "overwrite": {
+            "type": "boolean",
+            "required": false,
+            "default": true,
+            "description": "Whether to overwrite existing files"
+          }
+        },
+
+        "success_criteria": {
+          "returns": ["save_info", "saved_path"],
+          "file_formats": ["json", "parquet"],
+          "database_sync": "if_enabled"
+        }
+      },
+
+      "load_mediaplan": {
+        "function_name": "load_mediaplan",
+        "module_path": "media_agent.tools.mediaplan_tools",
+        "category": "mediaplan",
+        "priority": 3,
+        "description": "Load existing media plan from workspace by ID or path.",
+
+        "triggers": {
+          "user_intents": [
+            "load media plan",
+            "load plan",
+            "open media plan",
+            "load plan [id]"
+          ],
+          "prerequisites": ["workspace_loaded"]
+        },
+
+        "parameters": {
+          "media_plan_id": {
+            "type": "string",
+            "required": false,
+            "description": "Unique identifier of media plan to load (preferred method)",
+            "examples": ["mediaplan_abc123", "mediaplan_def456"]
+          },
+          "path": {
+            "type": "string",
+            "required": false,
+            "description": "Path to media plan file (alternative to ID)"
+          }
+        },
+
+        "success_criteria": {
+          "returns": ["plan_info", "media_plan_loaded"],
+          "session_state": "current_mediaplan_set",
+          "enables_operations": ["create_lineitem", "save_mediaplan", "validate_mediaplan"]
+        },
+
+        "validation_rules": {
+          "requires_id_or_path": true,
+          "loads_into_session": true
+        }
+      },
+
       "delete_mediaplan": {
         "function_name": "delete_mediaplan",
         "module_path": "media_agent.tools.mediaplan_tools",
         "category": "mediaplan",
-        "priority": 3,
+        "priority": 4,
         "description": "Delete media plan by ID. Requires explicit confirmation for safety.",
 
         "triggers": {
@@ -216,6 +416,120 @@
         "success_criteria": {
           "returns": ["deletion_info", "deleted_files"],
           "triggers_follow_up": ["list_mediaplans"]
+        }
+      },
+
+      "create_lineitem": {
+        "function_name": "create_lineitem",
+        "module_path": "media_agent.tools.mediaplan_tools",
+        "category": "mediaplan",
+        "priority": 5,
+        "description": "Add line item to current media plan with intelligent budget allocation guidance.",
+
+        "triggers": {
+          "user_intents": [
+            "create line item",
+            "add line item",
+            "create placement",
+            "allocate budget",
+            "add channel"
+          ],
+          "prerequisites": ["current_mediaplan_exists"]
+        },
+
+        "budget_allocation_guidance": {
+          "by_objective": {
+            "awareness": {
+              "social": {"min": 20, "max": 35, "recommended": 30},
+              "display": {"min": 15, "max": 30, "recommended": 25},
+              "video": {"min": 15, "max": 30, "recommended": 25},
+              "search": {"min": 10, "max": 20, "recommended": 15}
+            },
+            "consideration": {
+              "search": {"min": 30, "max": 40, "recommended": 35},
+              "social": {"min": 25, "max": 35, "recommended": 30},
+              "content": {"min": 15, "max": 25, "recommended": 20},
+              "display": {"min": 10, "max": 20, "recommended": 15}
+            },
+            "conversion": {
+              "search": {"min": 35, "max": 45, "recommended": 40},
+              "social_retargeting": {"min": 20, "max": 30, "recommended": 25},
+              "email": {"min": 15, "max": 25, "recommended": 20},
+              "display_retargeting": {"min": 10, "max": 20, "recommended": 15}
+            }
+          },
+          "channel_vehicle_mapping": {
+            "search": ["Google Ads", "Microsoft Ads", "Apple Search Ads"],
+            "social": ["Facebook Ads", "Instagram Ads", "LinkedIn Ads", "TikTok Ads", "Twitter Ads"],
+            "display": ["Google Display Network", "Amazon DSP", "The Trade Desk", "Adobe Advertising Cloud"],
+            "video": ["YouTube Ads", "Connected TV", "Hulu", "Netflix Ads", "Amazon Prime Video"],
+            "audio": ["Spotify Ad Studio", "Pandora", "SiriusXM", "Amazon Music"],
+            "ooh": ["Clear Channel", "JCDecaux", "Lamar Advertising"],
+            "print": ["Local newspapers", "Magazines", "Trade publications"]
+          }
+        },
+
+        "parameters": {
+          "name": {
+            "type": "string",
+            "required": true,
+            "description": "Descriptive name for the line item",
+            "examples": ["Google Search - Brand Terms", "Facebook Video Awareness", "LinkedIn Lead Gen"]
+          },
+          "start_date": {
+            "type": "string",
+            "required": true,
+            "format": "YYYY-MM-DD",
+            "validation": "within_campaign_period"
+          },
+          "end_date": {
+            "type": "string",
+            "required": true,
+            "format": "YYYY-MM-DD",
+            "validation": "after_start_date_within_campaign"
+          },
+          "cost_total": {
+            "type": "number",
+            "required": true,
+            "description": "Total cost allocation for this line item",
+            "validation": "positive_within_remaining_budget"
+          },
+          "channel": {
+            "type": "string",
+            "required": false,
+            "description": "Media channel category",
+            "examples": ["search", "social", "display", "video", "audio", "ooh", "print"]
+          },
+          "vehicle": {
+            "type": "string",
+            "required": false,
+            "description": "Specific media vehicle or platform",
+            "examples": ["Google Ads", "Facebook Ads", "YouTube", "Connected TV"]
+          },
+          "partner": {
+            "type": "string",
+            "required": false,
+            "description": "Media partner or publisher"
+          },
+          "kpi": {
+            "type": "string",
+            "required": false,
+            "description": "Key performance indicator for this line item",
+            "examples": ["cpm", "cpc", "cpa", "ctr", "cpv", "roas"]
+          }
+        },
+
+        "validation_rules": [
+          "Line item dates must be within campaign period",
+          "Cost must not exceed remaining budget",
+          "Minimum 1-day duration required",
+          "Channel and vehicle should be realistic combinations"
+        ],
+
+        "success_criteria": {
+          "returns": ["lineitem_info", "budget_summary"],
+          "updates_session": "current_mediaplan_lineitems",
+          "budget_tracking": "remaining_budget_calculated"
         }
       }
     }

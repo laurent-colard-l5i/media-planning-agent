@@ -181,11 +181,6 @@ def list_mediaplans(
             error=str(e)
         )
 
-@register_tool(
-    name="validate_mediaplan",
-    description="Validate the current media plan against schema and business rules.",
-    category="workspace"
-)
 def validate_mediaplan(session_state, **kwargs) -> Dict[str, Any]:
     """
     Validate the current media plan in session state.
@@ -239,11 +234,6 @@ def validate_mediaplan(session_state, **kwargs) -> Dict[str, Any]:
             error=str(e)
         )
 
-@register_tool(
-    name="get_workspace_info",
-    description="Get detailed information about the current workspace configuration and status.",
-    category="workspace"
-)
 def get_workspace_info(session_state, **kwargs) -> Dict[str, Any]:
     """
     Get comprehensive workspace information.
@@ -314,11 +304,6 @@ def get_workspace_info(session_state, **kwargs) -> Dict[str, Any]:
             error=str(e)
         )
 
-@register_tool(
-    name="list_campaigns",
-    description="List all campaigns across media plans in the workspace with statistics.",
-    category="workspace"
-)
 def list_campaigns(
     session_state,
     include_stats: bool = True,
