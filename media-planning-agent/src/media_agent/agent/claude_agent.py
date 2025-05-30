@@ -7,7 +7,10 @@ with full function calling support for tool execution.
 
 import json
 import os
+from pathlib import Path
 from typing import Dict, Any, List, Optional, Union
+from datetime import datetime, date
+from decimal import Decimal
 import logging
 
 try:
@@ -21,16 +24,28 @@ from ..tools.base import get_tool_registry
 
 logger = logging.getLogger(__name__)
 
+class CustomJSONEncoder(json.JSONEncoder):
+    """Custom JSON encoder that handles date, datetime, and Decimal objects."""
+
+    def default(self, obj):
+        if isinstance(obj, (date, datetime)):
+            return obj.isoformat()
+        elif isinstance(obj, Decimal):
+            return float(obj)
+        return super().default(obj)
+
 class ClaudeAgent(BaseAgent):
     """Claude-powered media planning agent with function calling support."""
 
-    def __init__(self, model_name: str = "claude-3-5-sonnet-20241022", api_key: Optional[str] = None):
+    def __init__(self, model_name: str = "claude-3-5-sonnet-20241022", api_key: Optional[str] = None,
+                 system_prompt_path: Optional[str] = None):
         """
         Initialize Claude agent.
 
         Args:
             model_name: Claude model to use
             api_key: Anthropic API key (if not provided, will use environment variable)
+            system_prompt_path: Path to system prompt markdown file (optional)
 
         Raises:
             AgentConfigurationError: If Claude is not available or API key is missing
@@ -60,81 +75,71 @@ class ClaudeAgent(BaseAgent):
         except Exception as e:
             raise AgentConfigurationError(f"Failed to initialize Anthropic client: {str(e)}")
 
-        # Build system prompt
-        self.system_prompt = self._build_system_prompt()
+        # Load system prompt (external file or fallback to built-in)
+        self.system_prompt = self._load_system_prompt(system_prompt_path)
 
         # Conversation history for Claude API
         self.conversation_history = []
 
         logger.info(f"Initialized Claude agent with model: {model_name}")
 
-    def _build_system_prompt(self) -> str:
-        """Build the system prompt for Claude."""
-        return """You are an expert media planning agent designed to help users create, manage, and optimize media plans using the MediaPlanPy SDK. You have access to various tools for workspace management and media plan operations.
+    def _load_system_prompt(self, custom_path: Optional[str] = None) -> str:
+        """
+        Load system prompt from external markdown file.
 
-## Your Role and Capabilities
+        Args:
+            custom_path: Custom path to system prompt file
 
-**Core Expertise:**
-- Strategic media planning consultation and best practices
-- Budget allocation and channel mix recommendations  
-- Campaign optimization and tactical media planning
-- Media plan data structure and validation
+        Returns:
+            System prompt content as string
+        """
+        # Determine prompt file path
+        if custom_path:
+            prompt_path = Path(custom_path)
+        else:
+            # Default to system_prompt.md in the same directory as this file
+            current_dir = Path(__file__).parent
+            prompt_path = current_dir / "system_prompt.md"
 
-**Available Tools:**
-You have access to tools for:
-- Workspace management (loading configurations, listing entities)
-- Media plan CRUD operations (create, save, validate, delete, load)
-- Line item creation and management
-- Data analysis and querying
+        # Try to load external prompt file
+        try:
+            if prompt_path.exists():
+                with open(prompt_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                logger.info(f"Loaded system prompt from: {prompt_path}")
+                return content
+            else:
+                logger.warning(f"System prompt file not found at: {prompt_path}")
+                return self._get_fallback_system_prompt()
+        except Exception as e:
+            logger.error(f"Failed to load system prompt from {prompt_path}: {e}")
+            return self._get_fallback_system_prompt()
 
-**Communication Style:**
-- Be conversational and helpful
-- Explain your reasoning for strategic recommendations
-- Ask clarifying questions when needed to gather requirements
-- Provide actionable advice and clear next steps
-- Use emojis appropriately for status updates (✅ ❌ ⚠️ 📋)
-- Structure responses clearly with key information highlighted
+    def _get_fallback_system_prompt(self) -> str:
+        """Fallback system prompt if external file cannot be loaded."""
+        logger.info("Using fallback system prompt")
+        return """You are an expert media planning agent designed to help users create, manage, and optimize media plans using the MediaPlanPy SDK.
 
-## Strategic Approach
+CRITICAL: When tools return structured data, ALWAYS display the actual details, not summaries.
 
-**When helping users create media plans:**
-1. **Understand the Brief**: Ask about business objectives, target audience, budget, timeline
-2. **Strategic Consultation**: Recommend channel mix, budget allocation, targeting approach based on industry best practices
-3. **Tactical Implementation**: Create the actual media plan with appropriate line items
-4. **Validation & Optimization**: Ensure the plan meets requirements and suggest improvements
+For list_mediaplans results:
+- Show individual media plan IDs (users need these)
+- Display exact creation dates and times
+- Show precise budget and cost figures
+- List each plan separately with specific details
+- Include line item counts and allocated costs as returned
 
-**Key Principles:**
-- Always load a workspace before performing media plan operations
-- Validate media plans before saving to ensure compliance
-- Recommend realistic budget allocations based on industry knowledge
-- Consider audience targeting and channel effectiveness
-- Ensure date ranges and budgets are logical and consistent
-- Think strategically about channel mix and budget allocation
+Example GOOD format:
+📋 Found X media plans:
 
-## Important Workflow Notes
-- Always start by loading a workspace using load_workspace
-- Strategic context is maintained only during this conversation session
-- When loading existing media plans, ask users for context since I won't have the previous strategic reasoning
-- Use the available tools - don't make up data or operations
-- Validate media plans before saving them
-- Provide clear next steps after each major operation
+1. **Campaign Name** (ID: mediaplan_abc123)
+   - Budget: $X | Allocated: $Y | Line items: Z
+   - Timeline: start to end | Created: exact timestamp
+   - Created by: email
 
-## Budget Allocation Best Practices
-When recommending budget allocation across channels:
-- Digital channels (Search, Social, Display): 60-80% for most campaigns
-- Search advertising: 25-40% for conversion-focused campaigns
-- Social media: 20-35% for awareness and engagement
-- Display/Video: 15-25% for reach and retargeting
-- Traditional media: 20-40% depending on audience and objectives
-- Always leave 5-10% buffer for optimization and testing
+[List each plan with its specific details]
 
-## Channel Recommendations by Objective
-- **Awareness**: Social media, Display, Video, OOH
-- **Consideration**: Search, Social, Content marketing
-- **Conversion**: Search, Social (retargeting), Email
-- **Retention**: Email, Social, Direct mail
-
-Remember: Your goal is to make media planning more efficient and strategic through intelligent assistance and automation. Always use your tools effectively and provide strategic value beyond just technical operations."""
+Never summarize tool results - show the actual data returned."""
 
     def chat(self, message: str, use_tools: bool = True) -> str:
         """
@@ -202,14 +207,27 @@ Remember: Your goal is to make media planning more efficient and strategic throu
                     "content": response.content
                 })
 
-                # Add tool results to history
+                # Add tool results to history with custom JSON encoder
                 for i, tool_call in enumerate(tool_calls_made):
+                    try:
+                        # Use custom encoder to handle dates and decimals
+                        tool_result_json = json.dumps(tool_call["result"], cls=CustomJSONEncoder)
+                        logger.debug(f"Successfully serialized tool result for {tool_call['tool_name']}")
+                    except Exception as e:
+                        logger.error(f"Failed to serialize tool result for {tool_call['tool_name']}: {e}")
+                        # Fallback: create a safe JSON representation
+                        tool_result_json = json.dumps({
+                            "success": tool_call["result"].get("success", False),
+                            "message": str(tool_call["result"].get("message", "Serialization error")),
+                            "error": f"JSON serialization failed: {str(e)}"
+                        })
+
                     self.conversation_history.append({
                         "role": "user",
                         "content": [{
                             "type": "tool_result",
                             "tool_use_id": tool_call["tool_use_id"],
-                            "content": json.dumps(tool_call["result"])
+                            "content": tool_result_json
                         }]
                     })
 
@@ -357,6 +375,23 @@ Remember: Your goal is to make media planning more efficient and strategic throu
         self.system_prompt += f"\n\n## Additional Context\n{context}"
         logger.debug("Updated Claude system context")
 
+    def reload_system_prompt(self, custom_path: Optional[str] = None) -> str:
+        """
+        Reload system prompt from file (useful for development).
+
+        Args:
+            custom_path: Custom path to system prompt file
+
+        Returns:
+            New system prompt content
+        """
+        old_prompt_length = len(self.system_prompt)
+        self.system_prompt = self._load_system_prompt(custom_path)
+        new_prompt_length = len(self.system_prompt)
+
+        logger.info(f"Reloaded system prompt: {old_prompt_length} → {new_prompt_length} characters")
+        return self.system_prompt
+
     def get_model_info(self) -> Dict[str, Any]:
         """Get detailed model information."""
         base_info = super().get_model_info()
@@ -364,7 +399,8 @@ Remember: Your goal is to make media planning more efficient and strategic throu
             "api_version": "2023-06-01",  # Anthropic API version
             "context_length": 200000 if "claude-3" in self.model_name else 100000,
             "supports_images": "claude-3" in self.model_name,
-            "supports_tool_calling": True
+            "supports_tool_calling": True,
+            "system_prompt_length": len(self.system_prompt)
         })
         return base_info
 

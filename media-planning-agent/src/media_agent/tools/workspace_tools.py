@@ -40,7 +40,8 @@ def load_workspace(session_state, workspace_path: Optional[str] = None, **kwargs
         logger.info(f"Loading workspace from path: {workspace_path or 'default locations'}")
 
         # Create workspace manager
-        manager = WorkspaceManager(workspace_path)
+        manager = WorkspaceManager()
+        manager.load(workspace_path=workspace_path)
 
         # Get resolved configuration
         config = manager.get_resolved_config()
