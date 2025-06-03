@@ -152,7 +152,27 @@ class ClaudeAgent(BaseAgent):
 
         complete_prompt = "\n\n".join(prompt_parts)
 
+        # Save system prompt to file in debug mode
+        if logger.isEnabledFor(logging.DEBUG):
+            try:
+                from datetime import datetime
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                filename = f"system_prompt_debug_{timestamp}.md"
+
+                with open(filename, 'w', encoding='utf-8') as f:
+                    f.write(f"# System Prompt Debug Output\n")
+                    f.write(f"Generated at: {datetime.now().isoformat()}\n")
+                    f.write(f"Model: {self.model_name}\n")
+                    f.write(f"Prompt length: {len(complete_prompt)} characters\n\n")
+                    f.write("---\n\n")
+                    f.write(complete_prompt)
+
+                logger.debug(f"System prompt saved to debug file: {filename}")
+            except Exception as e:
+                logger.warning(f"Failed to save debug system prompt: {e}")
+
         logger.info(f"Built complete system prompt: {len(complete_prompt)} characters")
+
         return complete_prompt
 
     def _load_base_system_prompt(self, custom_path: Optional[str] = None) -> str:
