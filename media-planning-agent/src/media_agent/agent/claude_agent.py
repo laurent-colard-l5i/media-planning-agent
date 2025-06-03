@@ -122,7 +122,7 @@ class ClaudeAgent(BaseAgent):
 
     def _build_complete_system_prompt(self, custom_path: Optional[str] = None) -> str:
         """
-        Build complete system prompt from external file plus registry enhancements.
+        Build complete system prompt from external file plus registry and schema enhancements.
 
         Args:
             custom_path: Custom path to system prompt file
@@ -136,11 +136,21 @@ class ClaudeAgent(BaseAgent):
         # Generate enhancements from tool registry
         registry_enhancements = generate_system_prompt_enhancement(self.tool_registry)
 
-        # Combine base prompt with registry-based enhancements
+        # Generate schema enhancements from MediaPlanPy
+        schema_enhancements = self._get_schema_enhancements()
+
+        # Combine all components
+        prompt_parts = [base_prompt]
+
         if registry_enhancements:
-            complete_prompt = f"{base_prompt}\n\n## Tool Registry Enhancements\n\n{registry_enhancements}"
-        else:
-            complete_prompt = base_prompt
+            prompt_parts.append("## Tool Registry Enhancements")
+            prompt_parts.append(registry_enhancements)
+
+        if schema_enhancements:
+            prompt_parts.append("## Schema Definitions")
+            prompt_parts.append(schema_enhancements)
+
+        complete_prompt = "\n\n".join(prompt_parts)
 
         logger.info(f"Built complete system prompt: {len(complete_prompt)} characters")
         return complete_prompt
@@ -474,4 +484,213 @@ Never summarize tool results - show the actual data returned."""
         })
         return base_info
 
-    # ... rest of the methods remain the same as before ...
+    def _get_schema_enhancements(self) -> str:
+        """
+        Generate schema definitions section for system prompt.
+
+        Returns:
+            Formatted schema definitions as markdown string
+        """
+        try:
+            # Determine schema version to use
+            schema_version = self._get_preferred_schema_version()
+
+            # Get schemas from MediaPlanPy
+            schemas = self._load_schemas(schema_version)
+
+            if not schemas:
+                logger.warning("No schemas loaded for system prompt")
+                return ""
+
+            # Format schemas for system prompt
+            return self._format_schemas_for_prompt(schemas, schema_version)
+
+        except Exception as e:
+            logger.error(f"Failed to generate schema enhancements: {e}")
+            return ""
+
+    def _get_preferred_schema_version(self) -> str:
+        """
+        Get preferred schema version from workspace or use default.
+
+        Returns:
+            Schema version string (e.g., 'v1.0.0')
+        """
+        try:
+            # Check if we have session state with workspace manager
+            if (hasattr(self, 'session_state') and
+                    self.session_state and
+                    hasattr(self.session_state, 'workspace_manager') and
+                    self.session_state.workspace_manager):
+
+                config = self.session_state.workspace_manager.get_resolved_config()
+                preferred_version = config.get('schema_settings', {}).get('preferred_version')
+
+                if preferred_version:
+                    logger.info(f"Using workspace preferred schema version: {preferred_version}")
+                    return preferred_version
+
+            # Fallback to current default
+            default_version = "v1.0.0"
+            logger.info(f"Using default schema version: {default_version}")
+            return default_version
+
+        except Exception as e:
+            logger.warning(f"Failed to get preferred schema version: {e}, using default")
+            return "v1.0.0"
+
+    def _load_schemas(self, schema_version: str) -> Dict[str, Dict[str, Any]]:
+        """
+        Load schemas from MediaPlanPy schema system.
+
+        Args:
+            schema_version: Version to load (e.g., 'v1.0.0')
+
+        Returns:
+            Dictionary containing schemas by type
+        """
+        schemas = {}
+        schema_types = ['mediaplan', 'campaign', 'lineitem']
+
+        try:
+            # Import MediaPlanPy schema components
+            from mediaplanpy.schema import SchemaManager
+
+            # Create schema manager instance
+            schema_manager = SchemaManager()
+
+            # Load each schema type
+            for schema_type in schema_types:
+                try:
+                    schema_data = schema_manager.get_schema(schema_type, schema_version)
+                    if schema_data:
+                        schemas[schema_type] = schema_data
+                        logger.debug(f"Loaded {schema_type} schema for {schema_version}")
+                    else:
+                        logger.warning(f"No {schema_type} schema found for {schema_version}")
+                except Exception as e:
+                    logger.error(f"Failed to load {schema_type} schema: {e}")
+                    continue
+
+            logger.info(f"Successfully loaded {len(schemas)} schemas for {schema_version}")
+            return schemas
+
+        except ImportError as e:
+            logger.error(f"Failed to import MediaPlanPy schema components: {e}")
+            return {}
+        except Exception as e:
+            logger.error(f"Failed to load schemas: {e}")
+            return {}
+
+    def _format_schemas_for_prompt(self, schemas: Dict[str, Dict[str, Any]], version: str) -> str:
+        """
+        Format schemas as markdown for system prompt inclusion.
+
+        Args:
+            schemas: Dictionary of schemas by type
+            version: Schema version string
+
+        Returns:
+            Formatted markdown string
+        """
+        if not schemas:
+            return ""
+
+        lines = []
+        lines.append(f"# Media Plan Data Structure Schemas ({version})")
+        lines.append("")
+        lines.append(
+            "The following JSON schemas define the data structures for media plans that you can create and manage:")
+        lines.append("")
+
+        # Define schema order and descriptions
+        schema_info = {
+            'mediaplan': {
+                'title': 'Media Plan Schema',
+                'description': 'Complete media plan structure including metadata, campaign, and line items'
+            },
+            'campaign': {
+                'title': 'Campaign Schema',
+                'description': 'Campaign-level information including objectives, budget, audience, and timeline'
+            },
+            'lineitem': {
+                'title': 'Line Item Schema',
+                'description': 'Individual media placement or buy within a campaign'
+            }
+        }
+
+        # Format each schema
+        for schema_type in ['mediaplan', 'campaign', 'lineitem']:
+            if schema_type not in schemas:
+                continue
+
+            schema_data = schemas[schema_type]
+            info = schema_info[schema_type]
+
+            lines.append(f"## {info['title']}")
+            lines.append("")
+            lines.append(info['description'])
+            lines.append("")
+
+            # Add required fields summary
+            required_fields = schema_data.get('required', [])
+            if required_fields:
+                lines.append(f"**Required fields:** {', '.join(required_fields)}")
+                lines.append("")
+
+            # Add enum values for key fields if available
+            enum_info = self._extract_enum_info(schema_data)
+            if enum_info:
+                lines.append("**Valid values for constrained fields:**")
+                for field, values in enum_info.items():
+                    lines.append(f"- `{field}`: {', '.join(values)}")
+                lines.append("")
+
+            # Add full schema as code block
+            lines.append("**Full JSON Schema:**")
+            lines.append("```json")
+            lines.append(json.dumps(schema_data, indent=2))
+            lines.append("```")
+            lines.append("")
+
+        # Add usage guidance
+        lines.append("## Schema Usage Guidelines")
+        lines.append("")
+        lines.append("- All media plans must conform to the mediaplan schema")
+        lines.append("- Use the campaign schema for campaign-level fields")
+        lines.append("- Each line item must conform to the lineitem schema")
+        lines.append("- Required fields must always be provided")
+        lines.append("- Enum fields must use exact values from the valid options")
+        lines.append("- Dates should be in YYYY-MM-DD format")
+        lines.append("- Monetary values should be numbers (not strings)")
+        lines.append("")
+
+        return "\n".join(lines)
+
+    def _extract_enum_info(self, schema: Dict[str, Any]) -> Dict[str, List[str]]:
+        """
+        Extract enum constraint information from schema.
+
+        Args:
+            schema: JSON schema dictionary
+
+        Returns:
+            Dictionary mapping field names to their enum values
+        """
+        enum_info = {}
+
+        def extract_enums_recursive(obj, path=""):
+            if isinstance(obj, dict):
+                if 'enum' in obj:
+                    field_name = path.split('.')[-1] if path else 'root'
+                    enum_info[field_name] = obj['enum']
+
+                for key, value in obj.items():
+                    new_path = f"{path}.{key}" if path else key
+                    extract_enums_recursive(value, new_path)
+            elif isinstance(obj, list):
+                for item in obj:
+                    extract_enums_recursive(item, path)
+
+        extract_enums_recursive(schema)
+        return enum_info

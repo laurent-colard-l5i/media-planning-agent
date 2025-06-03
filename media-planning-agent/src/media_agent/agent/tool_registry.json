@@ -424,7 +424,15 @@
         "module_path": "media_agent.tools.mediaplan_tools",
         "category": "mediaplan",
         "priority": 5,
-        "description": "Add line item to current media plan with intelligent budget allocation guidance.",
+        "description": "Create one or more line items using MediaPlanPy batch support. Thin wrapper around enhanced SDK method with atomic operations and comprehensive validation.",
+
+        "sdk_integration": {
+          "sdk_method": "MediaPlan.create_lineitem",
+          "validation_layer": "sdk",
+          "error_handling": "sdk_passthrough",
+          "atomic_operations": true,
+          "schema_support": "full_mediaplanschema_v1.0.0"
+        },
 
         "triggers": {
           "user_intents": [
@@ -432,104 +440,114 @@
             "add line item",
             "create placement",
             "allocate budget",
-            "add channel"
+            "add channel",
+            "create multiple line items",
+            "add all line items",
+            "create line items based on allocation",
+            "implement budget allocation"
           ],
           "prerequisites": ["current_mediaplan_exists"]
+        },
+
+        "parameters": {
+          "line_items": {
+            "type": "array",
+            "required": true,
+            "description": "Array of line item objects to create in batch. Each object supports ALL fields from mediaplanschema v1.0.0 specification. Validation handled by SDK.",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "description": "Line item object supporting all mediaplanschema v1.0.0 fields. SDK handles validation, field validation, and business rules.",
+              "required_fields": ["name", "start_date", "end_date", "cost_total"],
+              "supported_fields": "All fields from mediaplanschema v1.0.0 lineitem specification",
+              "examples": {
+                "basic": {
+                  "name": "Google Search Campaign",
+                  "start_date": "2025-07-01",
+                  "end_date": "2025-09-30",
+                  "cost_total": 50000,
+                  "channel": "search",
+                  "vehicle": "Google Ads"
+                },
+                "advanced": {
+                  "name": "Meta Video Campaign - NY Auto",
+                  "start_date": "2025-07-01",
+                  "end_date": "2025-09-30",
+                  "cost_total": 75000,
+                  "channel": "social",
+                  "vehicle": "Facebook Ads",
+                  "target_audience": "New York Car Buyers",
+                  "cost_media": 70000,
+                  "cost_platform": 5000,
+                  "kpi": "cpv"
+                }
+              }
+            }
+          }
         },
 
         "budget_allocation_guidance": {
           "by_objective": {
             "awareness": {
-              "social": {"min": 20, "max": 35, "recommended": 30},
-              "display": {"min": 15, "max": 30, "recommended": 25},
-              "video": {"min": 15, "max": 30, "recommended": 25},
-              "search": {"min": 10, "max": 20, "recommended": 15}
+              "social": {"recommended": 30},
+              "video": {"recommended": 25},
+              "display": {"recommended": 25},
+              "search": {"recommended": 15},
+              "buffer": {"recommended": 5}
             },
             "consideration": {
-              "search": {"min": 30, "max": 40, "recommended": 35},
-              "social": {"min": 25, "max": 35, "recommended": 30},
-              "content": {"min": 15, "max": 25, "recommended": 20},
-              "display": {"min": 10, "max": 20, "recommended": 15}
+              "search": {"recommended": 35},
+              "social": {"recommended": 30},
+              "content": {"recommended": 20},
+              "display": {"recommended": 15}
             },
             "conversion": {
-              "search": {"min": 35, "max": 45, "recommended": 40},
-              "social_retargeting": {"min": 20, "max": 30, "recommended": 25},
-              "email": {"min": 15, "max": 25, "recommended": 20},
-              "display_retargeting": {"min": 10, "max": 20, "recommended": 15}
+              "search": {"recommended": 40},
+              "social_retargeting": {"recommended": 25},
+              "email": {"recommended": 20},
+              "display": {"recommended": 15}
             }
-          },
-          "channel_vehicle_mapping": {
-            "search": ["Google Ads", "Microsoft Ads", "Apple Search Ads"],
-            "social": ["Facebook Ads", "Instagram Ads", "LinkedIn Ads", "TikTok Ads", "Twitter Ads"],
-            "display": ["Google Display Network", "Amazon DSP", "The Trade Desk", "Adobe Advertising Cloud"],
-            "video": ["YouTube Ads", "Connected TV", "Hulu", "Netflix Ads", "Amazon Prime Video"],
-            "audio": ["Spotify Ad Studio", "Pandora", "SiriusXM", "Amazon Music"],
-            "ooh": ["Clear Channel", "JCDecaux", "Lamar Advertising"],
-            "print": ["Local newspapers", "Magazines", "Trade publications"]
           }
         },
 
-        "parameters": {
-          "name": {
-            "type": "string",
-            "required": true,
-            "description": "Descriptive name for the line item",
-            "examples": ["Google Search - Brand Terms", "Facebook Video Awareness", "LinkedIn Lead Gen"]
-          },
-          "start_date": {
-            "type": "string",
-            "required": true,
-            "format": "YYYY-MM-DD",
-            "validation": "within_campaign_period"
-          },
-          "end_date": {
-            "type": "string",
-            "required": true,
-            "format": "YYYY-MM-DD",
-            "validation": "after_start_date_within_campaign"
-          },
-          "cost_total": {
-            "type": "number",
-            "required": true,
-            "description": "Total cost allocation for this line item",
-            "validation": "positive_within_remaining_budget"
-          },
-          "channel": {
-            "type": "string",
-            "required": false,
-            "description": "Media channel category",
-            "examples": ["search", "social", "display", "video", "audio", "ooh", "print"]
-          },
-          "vehicle": {
-            "type": "string",
-            "required": false,
-            "description": "Specific media vehicle or platform",
-            "examples": ["Google Ads", "Facebook Ads", "YouTube", "Connected TV"]
-          },
-          "partner": {
-            "type": "string",
-            "required": false,
-            "description": "Media partner or publisher"
-          },
-          "kpi": {
-            "type": "string",
-            "required": false,
-            "description": "Key performance indicator for this line item",
-            "examples": ["cpm", "cpc", "cpa", "ctr", "cpv", "roas"]
-          }
+        "agent_behavior": {
+          "operation_type": "atomic_batch_only",
+          "validation_approach": "defer_to_sdk",
+          "error_handling": "surface_sdk_errors_with_context",
+          "success_criteria": "all_items_created_or_none",
+          "budget_validation": "sdk_handles_comprehensive_checking"
         },
-
-        "validation_rules": [
-          "Line item dates must be within campaign period",
-          "Cost must not exceed remaining budget",
-          "Minimum 1-day duration required",
-          "Channel and vehicle should be realistic combinations"
-        ],
 
         "success_criteria": {
-          "returns": ["lineitem_info", "budget_summary"],
+          "returns": ["lineitems_created", "budget_summary", "created_count"],
           "updates_session": "current_mediaplan_lineitems",
-          "budget_tracking": "remaining_budget_calculated"
+          "budget_tracking": "sdk_calculated_remaining_budget",
+          "error_recovery": "sdk_transaction_rollback"
+        },
+
+        "error_patterns": {
+          "budget_exceeded": {
+            "sdk_exception": "BudgetExceededError",
+            "agent_response": "Suggest reducing costs or adjusting allocation",
+            "auto_recovery": false
+          },
+          "validation_failed": {
+            "sdk_exception": "ValidationError",
+            "agent_response": "Explain specific field issues and requirements",
+            "auto_recovery": true
+          },
+          "date_range_invalid": {
+            "sdk_exception": "DateRangeError",
+            "agent_response": "Check campaign period and date formats",
+            "auto_recovery": true
+          }
+        },
+
+        "performance_benefits": {
+          "batch_operations": "Single API call instead of multiple sequential calls",
+          "rate_limit_resistant": "Reduces API call frequency by up to 5x",
+          "atomic_operations": "All-or-nothing creation prevents partial failures",
+          "comprehensive_validation": "SDK handles all validation logic centrally"
         }
       }
     }
