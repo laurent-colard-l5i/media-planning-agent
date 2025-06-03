@@ -24,7 +24,7 @@ load_dotenv()
 
 # Set up logging
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.WARNING,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
         logging.FileHandler('media_agent.log'),
@@ -108,17 +108,22 @@ def handle_startup_error(error: Exception, provider: str) -> None:
               help='Specific model to use (optional, uses provider default)')
 @click.option('--workspace', '-w',
               help='Path to MediaPlanPy workspace configuration file')
+@click.option('--info', is_flag=True,
+              help='Enable info logging')
 @click.option('--debug', is_flag=True,
               help='Enable debug logging')
 @click.option('--tools-info', is_flag=True,
               help='Show available tools and exit')
-def cli(provider: str, model: str, workspace: str, debug: bool, tools_info: bool):
+def cli(provider: str, model: str, workspace: str, info: bool, debug: bool, tools_info: bool):
     """Interactive Media Planning Agent - Create and manage media plans with AI assistance."""
 
-    # Set debug logging if requested
+    # Set logging levels based on flags
     if debug:
         logging.getLogger().setLevel(logging.DEBUG)
         console.print("🐛 Debug logging enabled", style="yellow")
+    elif info:
+        logging.getLogger().setLevel(logging.INFO)
+        console.print("ℹ️ Info logging enabled", style="cyan")
 
     # Show tools info and exit if requested
     if tools_info:
