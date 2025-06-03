@@ -5,7 +5,7 @@ These tools handle creating, saving, loading, and deleting media plans
 using the MediaPlanPy SDK.
 """
 
-from typing import Dict, Any, Optional, Union
+from typing import Dict, Any, Optional, Union, List
 from decimal import Decimal
 from datetime import datetime, date
 import logging
@@ -386,120 +386,127 @@ def delete_mediaplan(
             error=str(e)
         )
 
+
 def create_lineitem(
-    session_state,
-    name: str,
-    start_date: str,
-    end_date: str,
-    cost_total: float,
-    channel: Optional[str] = None,
-    vehicle: Optional[str] = None,
-    partner: Optional[str] = None,
-    kpi: Optional[str] = None,
-    **kwargs
+        session_state,
+        line_items: List[Dict[str, Any]],
+        **kwargs
 ) -> Dict[str, Any]:
     """
-    Create and add a line item to the current media plan.
+    Create one or more line items using MediaPlanPy batch support.
+
+    This tool is now a thin wrapper around the enhanced SDK method that supports
+    batch creation with atomic operations and comprehensive validation.
 
     Args:
         session_state: Current session state
-        name: Line item name
-        start_date: Start date (YYYY-MM-DD)
-        end_date: End date (YYYY-MM-DD)
-        cost_total: Total cost for this line item
-        channel: Media channel (e.g., 'social', 'search', 'display')
-        vehicle: Media vehicle (e.g., 'Facebook', 'Google')
-        partner: Media partner/publisher
-        kpi: Key performance indicator
+        line_items: List of line item dictionaries. Each dictionary supports
+                   all fields from mediaplanschema v1.0.0 specification.
+                   Required fields: name, start_date, end_date, cost_total
         **kwargs: Additional arguments (ignored for compatibility)
 
     Returns:
-        Success/error result with line item information
+        Success/error result with line items information
     """
+    # Basic session state validation
     if not session_state.current_mediaplan:
         return create_error_result(
             "❌ No media plan loaded. Create or load a media plan first."
         )
 
-    try:
-        logger.info(f"Creating line item: {name}")
-
-        # Validate dates
-        try:
-            start_dt = datetime.strptime(start_date, '%Y-%m-%d').date()
-            end_dt = datetime.strptime(end_date, '%Y-%m-%d').date()
-        except ValueError as e:
-            return create_error_result(
-                f"❌ Invalid date format. Use YYYY-MM-DD. Error: {str(e)}",
-                error=f"Date parsing error: {str(e)}"
-            )
-
-        # Validate cost
-        if cost_total <= 0:
-            return create_error_result(
-                "❌ Cost must be greater than 0",
-                error="Invalid cost value"
-            )
-
-        # Create line item data
-        lineitem_data = {
-            "name": name,
-            "start_date": start_date,
-            "end_date": end_date,
-            "cost_total": cost_total
-        }
-
-        # Add optional fields if provided
-        if channel:
-            lineitem_data["channel"] = channel
-        if vehicle:
-            lineitem_data["vehicle"] = vehicle
-        if partner:
-            lineitem_data["partner"] = partner
-        if kpi:
-            lineitem_data["kpi"] = kpi
-
-        # Create line item using MediaPlanPy
-        lineitem = session_state.current_mediaplan.create_lineitem(
-            line_item=lineitem_data,
-            validate=True
+    if not line_items or not isinstance(line_items, list):
+        return create_error_result(
+            "❌ line_items parameter is required and must be a list of line item objects."
         )
 
-        lineitem_info = {
-            "id": lineitem.id,
-            "name": lineitem.name,
-            "cost_total": float(lineitem.cost_total),
-            "start_date": lineitem.start_date.isoformat(),
-            "end_date": lineitem.end_date.isoformat(),
-            "channel": getattr(lineitem, 'channel', None),
-            "vehicle": getattr(lineitem, 'vehicle', None),
-            "partner": getattr(lineitem, 'partner', None),
-            "kpi": getattr(lineitem, 'kpi', None)
-        }
+    if len(line_items) == 0:
+        return create_error_result(
+            "❌ line_items list cannot be empty. Provide at least one line item to create."
+        )
 
-        # Calculate updated totals
-        total_lineitem_cost = sum(float(li.cost_total) for li in session_state.current_mediaplan.lineitems)
+    try:
+        logger.info(f"Creating {len(line_items)} line item(s) via SDK batch method")
+
+        # Call enhanced SDK method directly - let it handle all validation and business logic
+        result = session_state.current_mediaplan.create_lineitem(
+            line_items=line_items,
+            validate=True  # Let SDK handle comprehensive validation
+        )
+
+        # SDK returns List[LineItem] for batch operations
+        created_lineitems = result if isinstance(result, list) else [result]
+
+        # Extract information for agent response
+        lineitem_summaries = []
+        total_cost = 0
+
+        for lineitem in created_lineitems:
+            lineitem_info = {
+                "id": lineitem.id,
+                "name": lineitem.name,
+                "cost_total": float(lineitem.cost_total),
+                "start_date": lineitem.start_date.isoformat(),
+                "end_date": lineitem.end_date.isoformat(),
+            }
+
+            # Include optional fields if present
+            optional_fields = ['channel', 'vehicle', 'partner', 'kpi', 'target_audience',
+                               'location_type', 'location_name', 'adformat']
+            for field in optional_fields:
+                value = getattr(lineitem, field, None)
+                if value is not None:
+                    lineitem_info[field] = value
+
+            lineitem_summaries.append(lineitem_info)
+            total_cost += float(lineitem.cost_total)
+
+        # Calculate updated budget information
         campaign_budget = float(session_state.current_mediaplan.campaign.budget_total)
-        remaining_budget = campaign_budget - total_lineitem_cost
+        total_allocated = sum(float(li.cost_total) for li in session_state.current_mediaplan.lineitems)
+        remaining_budget = campaign_budget - total_allocated
 
-        logger.info(f"Successfully created line item: {lineitem.id}")
+        # Create success response
+        success_message = f"✅ Successfully created {len(created_lineitems)} line item(s)! "
+        success_message += f"Total cost: ${total_cost:,.2f}, "
+        success_message += f"Remaining budget: ${remaining_budget:,.2f}"
+
+        logger.info(f"Successfully created {len(created_lineitems)} line items via SDK")
 
         return create_success_result(
-            f"✅ Created line item '{name}' successfully! " +
-            f"Cost: ${cost_total:,.2f}, " +
-            f"Remaining budget: ${remaining_budget:,.2f}",
-            lineitem_info=lineitem_info,
+            success_message,
+            lineitems_created=lineitem_summaries,
+            created_count=len(created_lineitems),
             budget_summary={
                 "campaign_budget": campaign_budget,
-                "allocated_budget": total_lineitem_cost,
+                "allocated_budget": total_allocated,
                 "remaining_budget": remaining_budget,
                 "total_lineitems": len(session_state.current_mediaplan.lineitems)
             }
         )
 
     except Exception as e:
-        logger.error(f"Error creating line item: {e}")
+        # Let SDK exceptions bubble up with clear context
+        logger.error(f"SDK create_lineitem failed: {e}")
+
+        # Format SDK error for agent consumption
+        error_message = f"❌ Failed to create line items: {str(e)}"
+
+        # Add helpful context based on common error types
+        error_context = ""
+        error_str = str(e).lower()
+
+        if "budget" in error_str or "exceed" in error_str:
+            error_context = "\n💡 Try reducing line item costs or adjusting budget allocation."
+        elif "date" in error_str:
+            error_context = "\n💡 Check that line item dates are within the campaign period and properly formatted (YYYY-MM-DD)."
+        elif "validation" in error_str or "required" in error_str:
+            error_context = "\n💡 Ensure all required fields (name, start_date, end_date, cost_total) are provided."
+        elif "schema" in error_str:
+            error_context = "\n💡 Check that field names and values match the mediaplanschema specification."
+
         return create_error_result(
-            f"❌ Failed to create line item: {str(e)}",
-            error=str(e)
+            error_message + error_context,
+            error=str(e),
+            error_type=type(e).__name__,
+            suggested_action="review_line_item_data"
         )
