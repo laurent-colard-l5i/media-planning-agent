@@ -200,7 +200,7 @@
         "module_path": "media_agent.tools.mediaplan_tools",
         "category": "mediaplan",
         "priority": 3,
-        "description": "Load existing media plan from workspace by ID or path.",
+        "description": "Load existing media plan from workspace by ID or path. Returns complete media plan structure including all line items, campaign details, and metadata.",
 
         "parameters": {
           "media_plan_id": {

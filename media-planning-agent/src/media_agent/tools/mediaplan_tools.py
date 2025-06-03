@@ -224,14 +224,15 @@ def save_mediaplan(
             error=str(e)
         )
 
+
 def load_mediaplan(
-    session_state,
-    media_plan_id: Optional[str] = None,
-    path: Optional[str] = None,
-    **kwargs
+        session_state,
+        media_plan_id: Optional[str] = None,
+        path: Optional[str] = None,
+        **kwargs
 ) -> Dict[str, Any]:
     """
-    Load an existing media plan.
+    Load an existing media plan and return complete structure.
 
     Args:
         session_state: Current session state
@@ -240,7 +241,7 @@ def load_mediaplan(
         **kwargs: Additional arguments (ignored for compatibility)
 
     Returns:
-        Success/error result with loaded media plan information
+        Success/error result with complete media plan structure
     """
     if not session_state.workspace_manager:
         return create_error_result(
@@ -265,12 +266,102 @@ def load_mediaplan(
         # Store in session state
         session_state.current_mediaplan = media_plan
 
-        # Extract information for response
+        # Convert to dictionary for JSON serialization
+        def serialize_media_plan(mp):
+            """Convert media plan to JSON-serializable dictionary."""
+            from datetime import date, datetime
+            from decimal import Decimal
+
+            def convert_value(obj):
+                if isinstance(obj, (date, datetime)):
+                    return obj.isoformat()
+                elif isinstance(obj, Decimal):
+                    return float(obj)
+                elif hasattr(obj, 'to_dict'):
+                    return obj.to_dict()
+                elif hasattr(obj, '__dict__'):
+                    return {k: convert_value(v) for k, v in obj.__dict__.items()}
+                elif isinstance(obj, list):
+                    return [convert_value(item) for item in obj]
+                elif isinstance(obj, dict):
+                    return {k: convert_value(v) for k, v in obj.items()}
+                else:
+                    return obj
+
+            return convert_value(mp)
+
+        # Get complete media plan structure
+        try:
+            # Try to use to_dict method if available
+            if hasattr(media_plan, 'to_dict'):
+                media_plan_data = media_plan.to_dict()
+            else:
+                # Fallback to manual serialization
+                media_plan_data = serialize_media_plan(media_plan)
+
+        except Exception as e:
+            logger.warning(f"Failed to serialize full media plan: {e}")
+            # Fallback to manual structure building
+            media_plan_data = {
+                "meta": {
+                    "id": media_plan.meta.id,
+                    "name": getattr(media_plan.meta, 'name', None),
+                    "schema_version": media_plan.meta.schema_version,
+                    "created_by": media_plan.meta.created_by,
+                    "created_at": media_plan.meta.created_at.isoformat(),
+                    "comments": getattr(media_plan.meta, 'comments', None)
+                },
+                "campaign": {
+                    "id": media_plan.campaign.id,
+                    "name": media_plan.campaign.name,
+                    "objective": media_plan.campaign.objective,
+                    "start_date": media_plan.campaign.start_date.isoformat(),
+                    "end_date": media_plan.campaign.end_date.isoformat(),
+                    "budget_total": float(media_plan.campaign.budget_total),
+                    # Add other campaign fields if they exist
+                },
+                "lineitems": []
+            }
+
+            # Add line items manually
+            for lineitem in media_plan.lineitems:
+                lineitem_data = {
+                    "id": lineitem.id,
+                    "name": lineitem.name,
+                    "start_date": lineitem.start_date.isoformat(),
+                    "end_date": lineitem.end_date.isoformat(),
+                    "cost_total": float(lineitem.cost_total),
+                    "channel": getattr(lineitem, 'channel', None),
+                    "vehicle": getattr(lineitem, 'vehicle', None),
+                    "partner": getattr(lineitem, 'partner', None),
+                    "kpi": getattr(lineitem, 'kpi', None),
+                    # Add other common fields
+                    "cost_media": float(getattr(lineitem, 'cost_media', 0)) if getattr(lineitem, 'cost_media',
+                                                                                       None) else None,
+                    "cost_buying": float(getattr(lineitem, 'cost_buying', 0)) if getattr(lineitem, 'cost_buying',
+                                                                                         None) else None,
+                    "metric_impressions": float(getattr(lineitem, 'metric_impressions', 0)) if getattr(lineitem,
+                                                                                                       'metric_impressions',
+                                                                                                       None) else None,
+                    "metric_clicks": float(getattr(lineitem, 'metric_clicks', 0)) if getattr(lineitem, 'metric_clicks',
+                                                                                             None) else None,
+                }
+                # Remove None values
+                lineitem_data = {k: v for k, v in lineitem_data.items() if v is not None}
+                media_plan_data["lineitems"].append(lineitem_data)
+
+        # Calculate totals for summary
+        total_lineitem_cost = sum(float(li.cost_total) for li in media_plan.lineitems)
+        remaining_budget = float(media_plan.campaign.budget_total) - total_lineitem_cost
+
+        # Extract basic info for response message
         plan_info = {
             "media_plan_id": media_plan.meta.id,
             "campaign_name": media_plan.campaign.name,
             "campaign_objective": media_plan.campaign.objective,
             "budget": float(media_plan.campaign.budget_total),
+            "allocated_budget": total_lineitem_cost,
+            "remaining_budget": remaining_budget,
             "start_date": media_plan.campaign.start_date.isoformat(),
             "end_date": media_plan.campaign.end_date.isoformat(),
             "created_by": media_plan.meta.created_by,
@@ -283,20 +374,35 @@ def load_mediaplan(
         # Check for strategic context in comments
         context_msg = ""
         if media_plan.meta.comments:
-            context_msg = f"\n\nStrategic Context: {media_plan.meta.comments[:200]}"
+            context_msg = f"\n\n📝 Strategic Context: {media_plan.meta.comments[:200]}"
             if len(media_plan.meta.comments) > 200:
                 context_msg += "..."
+
+        # Create detailed line items summary for message
+        lineitem_summary = ""
+        if media_plan.lineitems:
+            lineitem_summary = "\n\n📋 Line Items:"
+            for i, li in enumerate(media_plan.lineitems, 1):
+                channel_info = f" | {li.channel}" if getattr(li, 'channel', None) else ""
+                vehicle_info = f" - {li.vehicle}" if getattr(li, 'vehicle', None) else ""
+                lineitem_summary += f"\n{i}. {li.name}: ${float(li.cost_total):,.2f}{channel_info}{vehicle_info}"
+                lineitem_summary += f"   ({li.start_date.isoformat()} to {li.end_date.isoformat()})"
 
         logger.info(f"Successfully loaded media plan: {media_plan.meta.id}")
 
         return create_success_result(
-            f"✅ Loaded media plan '{media_plan.campaign.name}' successfully! " +
-            f"Budget: ${plan_info['budget']:,.2f}, " +
-            f"Line items: {plan_info['lineitem_count']}, " +
-            f"Created: {plan_info['created_at'][:10]}" +
-            context_msg,
+            f"✅ Loaded media plan '{media_plan.campaign.name}' successfully!\n" +
+            f"💰 Budget: ${plan_info['budget']:,.2f} | " +
+            f"Allocated: ${plan_info['allocated_budget']:,.2f} | " +
+            f"Remaining: ${plan_info['remaining_budget']:,.2f}\n" +
+            f"📅 Timeline: {plan_info['start_date']} to {plan_info['end_date']}\n" +
+            f"📊 Line items: {plan_info['lineitem_count']} | " +
+            f"Created: {plan_info['created_at'][:10]} by {plan_info['created_by']}" +
+            lineitem_summary + context_msg,
             plan_info=plan_info,
-            media_plan_loaded=True
+            media_plan_loaded=True,
+            # Include complete media plan structure for agent visibility
+            media_plan_data=media_plan_data
         )
 
     except Exception as e:
