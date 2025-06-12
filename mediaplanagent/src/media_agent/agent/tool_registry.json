@@ -243,59 +243,60 @@
         "enables": []
       },
 
-      "create_lineitem": {
-        "function_name": "create_lineitem",
-        "module_path": "media_agent.tools.mediaplan_tools",
-        "category": "mediaplan",
-        "priority": 5,
-        "description": "Add line item to current media plan with budget allocation.",
+        "create_lineitem": {
+          "function_name": "create_lineitem",
+          "module_path": "media_agent.tools.mediaplan_tools",
+          "category": "mediaplan",
+          "priority": 5,
+          "description": "Create one or more line items for the current media plan with strategic budget allocation. Supports bulk creation for efficient media mix implementation.",
 
-        "parameters": {
-          "name": {
-            "type": "string",
-            "required": true,
-            "description": "Descriptive name for the line item"
+          "parameters": {
+            "line_items": {
+              "type": "array",
+              "required": true,
+              "description": "List of line item objects to create. Each object must contain: name (string), start_date (YYYY-MM-DD), end_date (YYYY-MM-DD), cost_total (number). Optional fields include: channel, vehicle, partner, kpi, target_audience, location_type, location_name, adformat, and v2.0 fields like cost_currency, dayparts, inventory, plus all custom dimensions and metrics.",
+              "examples": [
+                [
+                  {
+                    "name": "Facebook Video Campaign",
+                    "start_date": "2025-07-01",
+                    "end_date": "2025-09-30",
+                    "cost_total": 62500,
+                    "channel": "Social",
+                    "vehicle": "Facebook",
+                    "partner": "Meta",
+                    "kpi": "Brand Awareness"
+                  },
+                  {
+                    "name": "Google Search Campaign",
+                    "start_date": "2025-07-01",
+                    "end_date": "2025-09-30",
+                    "cost_total": 50000,
+                    "channel": "Search",
+                    "vehicle": "Google Ads",
+                    "kpi": "Click-through Rate"
+                  }
+                ]
+              ]
+            }
           },
-          "start_date": {
-            "type": "string",
-            "required": true,
-            "description": "Line item start date in YYYY-MM-DD format"
-          },
-          "end_date": {
-            "type": "string",
-            "required": true,
-            "description": "Line item end date in YYYY-MM-DD format"
-          },
-          "cost_total": {
-            "type": "number",
-            "required": true,
-            "description": "Total cost allocation for this line item"
-          },
-          "channel": {
-            "type": "string",
-            "required": false,
-            "description": "Media channel category"
-          },
-          "vehicle": {
-            "type": "string",
-            "required": false,
-            "description": "Specific media vehicle or platform"
-          },
-          "partner": {
-            "type": "string",
-            "required": false,
-            "description": "Media partner or publisher"
-          },
-          "kpi": {
-            "type": "string",
-            "required": false,
-            "description": "Key performance indicator for this line item"
+
+          "prerequisites": ["current_mediaplan_exists"],
+          "enables": [],
+
+          "triggers": {
+            "user_intents": [
+              "add line items",
+              "create line items",
+              "build media mix",
+              "allocate budget",
+              "add channels",
+              "create tactical plan",
+              "implement strategy"
+            ],
+            "prerequisites": ["strategic_consultation_completed"]
           }
-        },
-
-        "prerequisites": ["current_mediaplan_exists"],
-        "enables": []
-      }
+        }
     }
   },
 
