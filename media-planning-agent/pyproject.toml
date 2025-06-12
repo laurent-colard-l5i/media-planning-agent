@@ -58,6 +58,7 @@ all = [
 # CLI entry point
 media-agent = "media_agent.main:cli"
 media-planning-agent = "media_agent.main:cli"
+mediaplanagent = "media_agent.main:cli"
 
 # Configuration for development tools
 [tool.black]
