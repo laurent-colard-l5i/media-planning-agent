@@ -107,7 +107,7 @@ def create_mediaplan_basic(
             "budget": float(media_plan.campaign.budget_total),
             "start_date": media_plan.campaign.start_date.isoformat(),
             "end_date": media_plan.campaign.end_date.isoformat(),
-            "created_by": media_plan.meta.created_by,
+            "created_by_name": media_plan.meta.created_by_name,  # ← Fixed for v2.0
             "created_at": media_plan.meta.created_at.isoformat(),
             "schema_version": media_plan.meta.schema_version,
             "lineitem_count": len(media_plan.lineitems)
@@ -307,9 +307,14 @@ def load_mediaplan(
                     "id": media_plan.meta.id,
                     "name": getattr(media_plan.meta, 'name', None),
                     "schema_version": media_plan.meta.schema_version,
-                    "created_by": media_plan.meta.created_by,
+                    "created_by_name": media_plan.meta.created_by_name,  # ← Fixed for v2.0
                     "created_at": media_plan.meta.created_at.isoformat(),
-                    "comments": getattr(media_plan.meta, 'comments', None)
+                    "comments": getattr(media_plan.meta, 'comments', None),
+                    # Add new v2.0 fields if they exist
+                    "created_by_id": getattr(media_plan.meta, 'created_by_id', None),
+                    "is_current": getattr(media_plan.meta, 'is_current', None),
+                    "is_archived": getattr(media_plan.meta, 'is_archived', None),
+                    "parent_id": getattr(media_plan.meta, 'parent_id', None)
                 },
                 "campaign": {
                     "id": media_plan.campaign.id,
@@ -364,7 +369,7 @@ def load_mediaplan(
             "remaining_budget": remaining_budget,
             "start_date": media_plan.campaign.start_date.isoformat(),
             "end_date": media_plan.campaign.end_date.isoformat(),
-            "created_by": media_plan.meta.created_by,
+            "created_by_name": media_plan.meta.created_by_name,  # ← Fixed for v2.0
             "created_at": media_plan.meta.created_at.isoformat(),
             "lineitem_count": len(media_plan.lineitems),
             "has_comments": bool(media_plan.meta.comments),
@@ -397,7 +402,7 @@ def load_mediaplan(
             f"Remaining: ${plan_info['remaining_budget']:,.2f}\n" +
             f"📅 Timeline: {plan_info['start_date']} to {plan_info['end_date']}\n" +
             f"📊 Line items: {plan_info['lineitem_count']} | " +
-            f"Created: {plan_info['created_at'][:10]} by {plan_info['created_by']}" +
+            f"Created: {plan_info['created_at'][:10]} by {plan_info['created_by_name']}" +  # ← Fixed for v2.0
             lineitem_summary + context_msg,
             plan_info=plan_info,
             media_plan_loaded=True,
