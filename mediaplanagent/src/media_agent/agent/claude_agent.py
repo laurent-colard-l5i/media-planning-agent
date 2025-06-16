@@ -157,7 +157,11 @@ class ClaudeAgent(BaseAgent):
             try:
                 from datetime import datetime
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                filename = f"system_prompt_debug_{timestamp}.md"
+
+                # FIXED: Save to debug_output directory instead of root
+                debug_dir = Path("debug_output")
+                debug_dir.mkdir(exist_ok=True)
+                filename = debug_dir / f"{timestamp}_debug_system_prompt.md"
 
                 with open(filename, 'w', encoding='utf-8') as f:
                     f.write(f"# System Prompt Debug Output\n")
@@ -534,7 +538,7 @@ Never summarize tool results - show the actual data returned."""
         Get preferred schema version from workspace or use default.
 
         Returns:
-            Schema version string (e.g., 'v1.0.0')
+            Schema version string (e.g., 'v2.0')
         """
         try:
             # Check if we have session state with workspace manager
@@ -550,27 +554,26 @@ Never summarize tool results - show the actual data returned."""
                     logger.info(f"Using workspace preferred schema version: {preferred_version}")
                     return preferred_version
 
-            # Fallback to current default
-            default_version = "v1.0.0"
+            default_version = "v2.0"
             logger.info(f"Using default schema version: {default_version}")
             return default_version
 
         except Exception as e:
             logger.warning(f"Failed to get preferred schema version: {e}, using default")
-            return "v1.0.0"
+            return "v2.0"
 
     def _load_schemas(self, schema_version: str) -> Dict[str, Dict[str, Any]]:
         """
         Load schemas from MediaPlanPy schema system.
 
         Args:
-            schema_version: Version to load (e.g., 'v1.0.0')
+            schema_version: Version to load (e.g., 'v2.0')
 
         Returns:
             Dictionary containing schemas by type
         """
         schemas = {}
-        schema_types = ['mediaplan', 'campaign', 'lineitem']
+        schema_types = ['mediaplan', 'campaign', 'lineitem', 'dictionary']
 
         try:
             # Import MediaPlanPy schema components
@@ -605,13 +608,6 @@ Never summarize tool results - show the actual data returned."""
     def _format_schemas_for_prompt(self, schemas: Dict[str, Dict[str, Any]], version: str) -> str:
         """
         Format schemas as markdown for system prompt inclusion.
-
-        Args:
-            schemas: Dictionary of schemas by type
-            version: Schema version string
-
-        Returns:
-            Formatted markdown string
         """
         if not schemas:
             return ""
@@ -623,7 +619,7 @@ Never summarize tool results - show the actual data returned."""
             "The following JSON schemas define the data structures for media plans that you can create and manage:")
         lines.append("")
 
-        # Define schema order and descriptions
+        # FIXED: Updated schema order and descriptions to include dictionary
         schema_info = {
             'mediaplan': {
                 'title': 'Media Plan Schema',
@@ -636,11 +632,15 @@ Never summarize tool results - show the actual data returned."""
             'lineitem': {
                 'title': 'Line Item Schema',
                 'description': 'Individual media placement or buy within a campaign'
+            },
+            'dictionary': {
+                'title': 'Dictionary Schema',
+                'description': 'Standard dictionary values and enumerations used across media plan components'
             }
         }
 
-        # Format each schema
-        for schema_type in ['mediaplan', 'campaign', 'lineitem']:
+        # Format each schema (updated order to include dictionary)
+        for schema_type in ['mediaplan', 'campaign', 'lineitem', 'dictionary']:
             if schema_type not in schemas:
                 continue
 
@@ -673,16 +673,18 @@ Never summarize tool results - show the actual data returned."""
             lines.append("```")
             lines.append("")
 
-        # Add usage guidance
+        # Add usage guidelines (updated for v2.0.0)
         lines.append("## Schema Usage Guidelines")
         lines.append("")
         lines.append("- All media plans must conform to the mediaplan schema")
         lines.append("- Use the campaign schema for campaign-level fields")
         lines.append("- Each line item must conform to the lineitem schema")
+        lines.append("- Use the dictionary schema for standard enumeration values")
         lines.append("- Required fields must always be provided")
         lines.append("- Enum fields must use exact values from the valid options")
         lines.append("- Dates should be in YYYY-MM-DD format")
         lines.append("- Monetary values should be numbers (not strings)")
+        lines.append("- For v2.0.0 features, refer to the updated schema specifications")
         lines.append("")
 
         return "\n".join(lines)
