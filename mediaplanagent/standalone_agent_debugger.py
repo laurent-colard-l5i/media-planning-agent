@@ -145,7 +145,7 @@ class StandaloneAgentDebugger:
         configure_windows_console()
 
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        log_file = self.debug_output_dir / f"debug_{timestamp}.log"
+        log_file = self.debug_output_dir / f"{timestamp}_debug_log.log"
 
         # Create logger
         logger = logging.getLogger()
@@ -739,7 +739,7 @@ def run_debug_scenario_conversation():
     response1 = debugger.chat_with_agent("Load my workspace from C:\mediaplanpy\workspace_c990700e_settings.json")
     print(f"\nResponse 1: {response1[:200]}{'...' if len(response1) > 200 else ''}")
 
-    response2 = debugger.chat_with_agent("Create a media plan for a fitness app launch with $100K budget")
+    response2 = debugger.chat_with_agent("I am planning a campaign in Q325 which will be targeting car purchasers in New York State with a total budget of $250,000, with the objective to drive awareness and consideration. Please assign a name and a description based on this brief. My email address is lc@planmatic.io")
     print(f"\nResponse 2: {response2[:200]}{'...' if len(response2) > 200 else ''}")
 
     response3 = debugger.chat_with_agent("Add line items for Facebook and Google with strategic budget allocation")
