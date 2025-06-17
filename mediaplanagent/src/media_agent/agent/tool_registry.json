@@ -84,24 +84,108 @@
         "module_path": "media_agent.tools.workspace_tools",
         "category": "workspace",
         "priority": 2,
-        "description": "List all media plans in workspace with detailed information and statistics.",
+        "description": "List all media plans in workspace with detailed information, statistics, and powerful filtering capabilities. Supports exact match, range, list, and regex filters.",
 
         "parameters": {
           "include_stats": {
             "type": "boolean",
             "required": false,
             "default": true,
-            "description": "Include line item counts and budget allocation statistics"
+            "description": "Include line item counts, budget allocation statistics, and channel diversity metrics"
           },
           "limit": {
             "type": "integer",
             "required": false,
-            "description": "Maximum number of media plans to return"
+            "description": "Maximum number of media plans to return (applied after filtering)"
+          },
+          "filters": {
+            "type": "object",
+            "required": false,
+            "description": "Dictionary of filters to apply. Supports multiple filter types for precise media plan discovery.",
+            "properties": {
+              "field_name": {
+                "oneOf": [
+                  {
+                    "type": "string",
+                    "description": "Exact match filter"
+                  },
+                  {
+                    "type": "array",
+                    "description": "List/IN filter - matches any value in the list"
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "min": {"description": "Minimum value for range filter"},
+                      "max": {"description": "Maximum value for range filter"},
+                      "regex": {"type": "string", "description": "Regular expression pattern"}
+                    },
+                    "description": "Range filter (min/max) or regex pattern filter"
+                  }
+                ]
+              }
+            },
+            "examples": [
+              {
+                "description": "Find awareness campaigns only",
+                "value": {"campaign_objective": "awareness"}
+              },
+              {
+                "description": "Find campaigns with specific objectives",
+                "value": {"campaign_objective": ["awareness", "consideration"]}
+              },
+              {
+                "description": "Find high-budget campaigns",
+                "value": {"campaign_budget_total": {"min": 100000}}
+              },
+              {
+                "description": "Find campaigns in budget range",
+                "value": {"campaign_budget_total": {"min": 50000, "max": 200000}}
+              },
+              {
+                "description": "Find campaigns by name pattern",
+                "value": {"campaign_name": {"regex": ".*Summer.*"}}
+              },
+              {
+                "description": "Find recent campaigns",
+                "value": {"campaign_start_date": {"min": "2025-01-01"}}
+              },
+              {
+                "description": "Combined filters",
+                "value": {
+                  "campaign_objective": ["awareness", "consideration"],
+                  "campaign_budget_total": {"min": 75000},
+                  "meta_created_by_name": "john@company.com"
+                }
+              }
+            ]
           }
         },
 
         "prerequisites": ["workspace_loaded"],
-        "enables": []
+        "enables": [],
+
+        "common_filter_fields": {
+          "campaign_fields": [
+            "campaign_name",
+            "campaign_objective",
+            "campaign_budget_total",
+            "campaign_start_date",
+            "campaign_end_date"
+          ],
+          "meta_fields": [
+            "meta_id",
+            "meta_created_by_name",
+            "meta_created_at",
+            "meta_status"
+          ],
+          "statistics_fields": [
+            "stat_lineitem_count",
+            "stat_total_cost",
+            "stat_distinct_channel_count",
+            "stat_distinct_vehicle_count"
+          ]
+        }
       },
 
       "validate_mediaplan": {

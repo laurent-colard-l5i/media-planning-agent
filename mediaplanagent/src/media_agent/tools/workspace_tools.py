@@ -180,23 +180,30 @@ def load_workspace(
             loading_method=load_method
         )
 
+
 def list_mediaplans(
-    session_state,
-    include_stats: bool = True,
-    limit: Optional[int] = None,
-    **kwargs
+        session_state,
+        include_stats: bool = True,
+        limit: Optional[int] = None,
+        filters: Optional[Dict[str, Any]] = None,
+        **kwargs
 ) -> Dict[str, Any]:
     """
-    List media plans in the current workspace.
+    List media plans in the current workspace with optional filtering.
 
     Args:
         session_state: Current session state
         include_stats: Whether to include statistics for each media plan
         limit: Maximum number of media plans to return (optional)
+        filters: Dictionary of filters to apply. Supports multiple filter types:
+                - Exact match: {"field": "value"}
+                - List/IN match: {"field": ["value1", "value2"]}
+                - Range filter: {"field": {"min": 100, "max": 500}}
+                - Regex filter: {"field": {"regex": "pattern"}}
         **kwargs: Additional arguments (ignored for compatibility)
 
     Returns:
-        Success/error result with media plan list
+        Success/error result with filtered media plan list
     """
     if not session_state.workspace_manager:
         return create_error_result(
@@ -204,28 +211,71 @@ def list_mediaplans(
         )
 
     try:
-        logger.info("Listing media plans in workspace")
+        logger.info(f"Listing media plans in workspace with filters: {filters}")
 
-        # Get media plans using MediaPlanPy SDK
+        # Validate filters if provided
+        if filters:
+            validation_result = _validate_filters(filters)
+            if not validation_result["valid"]:
+                return create_error_result(
+                    f"❌ Invalid filter format: {validation_result['error']}",
+                    error=validation_result['error'],
+                    filter_examples=_get_filter_examples()
+                )
+
+        # Get media plans using MediaPlanPy SDK with filters
         plans = session_state.workspace_manager.list_mediaplans(
+            filters=filters,
             include_stats=include_stats,
             return_dataframe=False
         )
 
-        # Apply limit if specified
+        # Apply limit if specified (post-filtering)
+        original_count = len(plans)
         if limit and len(plans) > limit:
             plans = plans[:limit]
-            limited_msg = f" (showing first {limit})"
+            limited_msg = f" (showing first {limit} of {original_count})"
         else:
             limited_msg = ""
 
+        # Create filter summary for user feedback
+        filter_summary = ""
+        if filters:
+            filter_parts = []
+            for field, filter_value in filters.items():
+                if isinstance(filter_value, list):
+                    filter_parts.append(f"{field} in {filter_value}")
+                elif isinstance(filter_value, dict):
+                    if 'min' in filter_value and 'max' in filter_value:
+                        filter_parts.append(f"{field} between {filter_value['min']} and {filter_value['max']}")
+                    elif 'min' in filter_value:
+                        filter_parts.append(f"{field} >= {filter_value['min']}")
+                    elif 'max' in filter_value:
+                        filter_parts.append(f"{field} <= {filter_value['max']}")
+                    elif 'regex' in filter_value:
+                        filter_parts.append(f"{field} matches '{filter_value['regex']}'")
+                else:
+                    filter_parts.append(f"{field} = {filter_value}")
+
+            if filter_parts:
+                filter_summary = f"\n🔍 Applied filters: {', '.join(filter_parts)}"
+
         # Format response based on number of plans
         if not plans:
-            return create_success_result(
-                "📋 No media plans found in workspace. Use create_mediaplan_basic to create your first media plan.",
-                media_plans=[],
-                count=0
-            )
+            if filters:
+                return create_success_result(
+                    f"📋 No media plans found matching the specified filters.{filter_summary}" +
+                    "\n💡 Try adjusting your filter criteria or use 'list_mediaplans' without filters to see all plans.",
+                    media_plans=[],
+                    count=0,
+                    filters_applied=filters
+                )
+            else:
+                return create_success_result(
+                    "📋 No media plans found in workspace. Use create_mediaplan_basic to create your first media plan.",
+                    media_plans=[],
+                    count=0
+                )
 
         # Format plan information for display
         plan_summaries = []
@@ -237,33 +287,127 @@ def list_mediaplans(
                 "budget": plan.get("campaign_budget_total", 0),
                 "start_date": plan.get("campaign_start_date", "Unknown"),
                 "end_date": plan.get("campaign_end_date", "Unknown"),
-                "created_by": plan.get("meta_created_by", "Unknown"),
+                "created_by": plan.get("meta_created_by_name", plan.get("meta_created_by", "Unknown")),
+                # Handle both v1.0 and v2.0
                 "created_at": plan.get("meta_created_at", "Unknown")
             }
 
             # Add statistics if available
             if include_stats:
                 summary.update({
-                    "lineitem_count": plan.get("lineitem_count", 0),
-                    "total_cost": plan.get("total_lineitem_cost", 0)
+                    "lineitem_count": plan.get("stat_lineitem_count", 0),
+                    "total_cost": plan.get("stat_total_cost", 0),
+                    "allocated_budget": plan.get("stat_total_cost", 0),  # Alias for clarity
+                    "remaining_budget": max(0, summary["budget"] - plan.get("stat_total_cost", 0))
                 })
+
+                # Add channel diversity stats if available
+                channel_count = plan.get("stat_distinct_channel_count", 0)
+                vehicle_count = plan.get("stat_distinct_vehicle_count", 0)
+                if channel_count > 0 or vehicle_count > 0:
+                    summary["channel_diversity"] = {
+                        "distinct_channels": channel_count,
+                        "distinct_vehicles": vehicle_count
+                    }
 
             plan_summaries.append(summary)
 
+        success_message = f"✅ Found {len(plans)} media plan(s){limited_msg}"
+        if filter_summary:
+            success_message += filter_summary
+
+        logger.info(f"Successfully listed {len(plans)} media plans with filters applied")
+
         return create_success_result(
-            f"✅ Found {len(plans)} media plan(s){limited_msg}",
+            success_message,
             media_plans=plan_summaries,
             count=len(plans),
-            has_more=limit and len(plans) >= limit
+            original_count=original_count if limit else len(plans),
+            has_more=limit and original_count > limit,
+            filters_applied=filters
         )
 
     except Exception as e:
         logger.error(f"Error listing media plans: {e}")
         return create_error_result(
             f"❌ Failed to list media plans: {str(e)}",
-            error=str(e)
+            error=str(e),
+            filters_applied=filters
         )
 
+
+def _validate_filters(filters: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Validate filter format and provide helpful error messages.
+
+    Args:
+        filters: Dictionary of filters to validate
+
+    Returns:
+        Dictionary with 'valid' boolean and 'error' message if invalid
+    """
+    if not isinstance(filters, dict):
+        return {
+            "valid": False,
+            "error": "Filters must be a dictionary with field names as keys"
+        }
+
+    for field, filter_value in filters.items():
+        if not isinstance(field, str):
+            return {
+                "valid": False,
+                "error": f"Filter field names must be strings, got {type(field)}"
+            }
+
+        # Check filter value types
+        if isinstance(filter_value, dict):
+            # Range or regex filter
+            valid_keys = {'min', 'max', 'regex'}
+            if not any(key in filter_value for key in valid_keys):
+                return {
+                    "valid": False,
+                    "error": f"Dictionary filters must contain 'min', 'max', or 'regex' keys, got {list(filter_value.keys())}"
+                }
+
+            # Validate range filters have comparable values
+            if 'min' in filter_value and 'max' in filter_value:
+                try:
+                    if filter_value['min'] > filter_value['max']:
+                        return {
+                            "valid": False,
+                            "error": f"Range filter min ({filter_value['min']}) cannot be greater than max ({filter_value['max']})"
+                        }
+                except TypeError:
+                    return {
+                        "valid": False,
+                        "error": f"Range filter min and max values must be comparable types"
+                    }
+
+        elif isinstance(filter_value, list):
+            # List filter
+            if len(filter_value) == 0:
+                return {
+                    "valid": False,
+                    "error": f"List filters cannot be empty for field '{field}'"
+                }
+        # Scalar values (str, int, float, bool) are always valid
+
+    return {"valid": True, "error": None}
+
+
+def _get_filter_examples() -> Dict[str, Any]:
+    """Get example filter formats for error messages."""
+    return {
+        "exact_match": {"campaign_objective": "awareness"},
+        "list_match": {"campaign_objective": ["awareness", "consideration"]},
+        "range_filter": {"campaign_budget_total": {"min": 50000, "max": 200000}},
+        "regex_filter": {"campaign_name": {"regex": ".*Summer.*"}},
+        "date_range": {"campaign_start_date": {"min": "2025-01-01", "max": "2025-12-31"}},
+        "combined": {
+            "campaign_objective": ["awareness", "consideration"],
+            "campaign_budget_total": {"min": 100000}
+        }
+    }
 
 def validate_mediaplan(session_state, **kwargs) -> Dict[str, Any]:
     """

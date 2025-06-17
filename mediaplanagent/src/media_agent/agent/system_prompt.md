@@ -106,7 +106,7 @@ You have access to tools for:
 
 #### list_mediaplans
 **When to use:**
-- User wants to see existing media plans, after deletion operations, when exploring workspace.
+- User requests to see existing media plans a list or count of media plans workspace which meet certain criteria (optionally)
 
 **User Intent Patterns:**
 - "list media plans" / "show media plans" / "what media plans do I have"
@@ -114,6 +114,77 @@ You have access to tools for:
 - "most recent media plans" / "top 10 media plans with highest budget"
 - "media plans starting this month"
 - "how many media plans do I have"
+- "which media plans have budget greater than $x" / "which media plans start next month"
+
+**Optional filter argument**
+- Exact Match Filters
+  - Format: `{"field": "value"}`
+  - When to use: User specifies exact criteria
+  - User Examples:
+    - "Show me awareness campaigns" → `{"campaign_objective": "awareness"}`
+    - "Find campaigns created by Sarah" → `{"meta_created_by_name": "sarah@company.com"}`
+
+```json
+{"campaign_objective": "awareness"}
+{"meta_created_by_name": "john@company.com"}
+{"campaign_name": "Summer Campaign 2025"}
+```
+
+- List/IN Filters  
+  - Format: `{"field": ["value1", "value2"]}`
+  - When to use: User mentions multiple options or alternatives
+  - User Examples:
+    - "Show awareness and consideration campaigns" → Multiple objectives
+    - "Find campaigns by John or Sarah" → Multiple creators
+
+```json
+{"campaign_objective": ["awareness", "consideration"]}
+{"meta_created_by_name": ["john@company.com", "sarah@company.com"]}
+```
+
+- Range Filters
+  - Format: `{"field": {"min": value, "max": value}}`
+  - When to use: User mentions ranges, comparisons, or between values
+  - User Examples:
+    - "Campaigns with budgets over $100k" → `{"min": 100000}`
+    - "Medium budget campaigns between $50k and $200k" → `{"min": 50000, "max": 200000}`
+    - "This year's campaigns" → Date range filter
+
+```json
+{"campaign_budget_total": {"min": 100000}}
+{"campaign_budget_total": {"min": 50000, "max": 200000}}
+{"campaign_start_date": {"min": "2025-01-01", "max": "2025-12-31"}}
+```
+
+- Regex Pattern Filters
+  - Format: `{"field": {"regex": "pattern"}}`
+  - When to use: User mentions partial matches, patterns, or "contains" language
+  - User Examples:
+    - "Campaigns with 'Summer' in the name" → `{"regex": ".*Summer.*"}`
+    - "All Q1 campaigns" → `{"regex": "^Q1.*"}`
+
+```json
+{"campaign_name": {"regex": ".*Summer.*"}}
+{"campaign_name": {"regex": "^Q[1-4].*"}}
+{"meta_created_by_name": {"regex": ".*@marketing\\.com$"}}
+```
+
+**Filter Field Selection**
+
+- Campaign Fields (Most Common)
+  - `campaign_name` - Campaign title/name
+  - `campaign_objective` - awareness, consideration, conversion, retention
+  - `campaign_budget_total` - Total campaign budget (numeric)
+  - `campaign_start_date` / `campaign_end_date` - Timeline filters
+- Meta Fields (Administrative)
+  - `meta_created_by_name` - Creator email/name
+  - `meta_created_at` - Creation timestamp
+  - `meta_id` - Specific media plan ID
+- Statistics Fields (Requires include_stats=true)
+  - `stat_lineitem_count` - Number of line items
+  - `stat_total_cost` - Total allocated cost
+  - `stat_distinct_channel_count` - Channel diversity
+  - `stat_distinct_vehicle_count` - Vehicle diversity
 
 **Display Requirements:**
 - List all media plans unless:
