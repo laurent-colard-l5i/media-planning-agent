@@ -387,7 +387,7 @@
         "parameters": {},
         "prerequisites": [
           "workspace_loaded",
-          "current_mediaplan_exists"
+          "mediaplan_loaded"
         ],
         "enables": []
       }
@@ -417,8 +417,8 @@
         "prerequisites": ["workspace_loaded"],
         "enables": ["create_lineitem", "save_mediaplan", "validate_mediaplan"]
       },
-      "create_mediaplan_basic": {
-        "function_name": "create_mediaplan_basic",
+      "create_mediaplan": {
+        "function_name": "create_mediaplan",
         "module_path": "media_agent.tools.mediaplan_tools",
         "category": "mediaplan",
         "priority": 1,
@@ -433,8 +433,7 @@
           "campaign_objective": {
             "type": "string",
             "required": true,
-            "description": "Campaign objective",
-            "enum": ["awareness", "consideration", "conversion", "retention", "loyalty", "other"]
+            "description": "Campaign objective"
           },
           "start_date": {
             "type": "string",
@@ -454,7 +453,7 @@
           "created_by": {
             "type": "string",
             "required": true,
-            "description": "Email address of plan creator"
+            "description": "Name of plan creator"
           },
           "product_name": {
             "type": "string",

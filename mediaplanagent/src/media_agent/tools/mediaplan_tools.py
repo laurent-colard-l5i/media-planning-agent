@@ -17,7 +17,7 @@ from .base import register_tool, create_success_result, create_error_result
 
 logger = logging.getLogger(__name__)
 
-def create_mediaplan_basic(
+def create_mediaplan(
     session_state,
     campaign_name: str,
     campaign_objective: str,

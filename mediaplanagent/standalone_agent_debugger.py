@@ -790,14 +790,26 @@ def run_debug_scenario_conversation():
 
     # mediaplan_tools.load_mediaplan
 
-    response5 = debugger.chat_with_agent("Load media plan mediaplan_bfde4972")
-    print(f"\nResponse 5: {response5[:200]}{'...' if len(response5) > 200 else ''}")
-
-
+    # response5 = debugger.chat_with_agent("Load media plan mediaplan_bfde4972")
+    # print(f"\nResponse 5: {response5[:200]}{'...' if len(response5) > 200 else ''}")
 
     # workspace_tools.validate_mediaplan
     # LOGICAL ISSUE: This method requires a media plan to be loaded which itself validates the media plan
     # Either we should deprecate this Tool or make it a media plan-level tool
+
+    # response6 = debugger.chat_with_agent("Validate this media plan")
+    # print(f"\nResponse 5: {response6[:200]}{'...' if len(response6) > 200 else ''}")
+
+    # mediaplan_tools.create_mediaplan
+
+    response7 = debugger.chat_with_agent("I am planning a campaign in Q325 which will be targeting car purchasers in New York State with a total budget of $250,000, with the objective to drive awareness and consideration. Please assign a name and a description based on this brief. My name is Laurent Colard and my agency name is Level5i")
+    print(f"\nResponse 7: {response7[:200]}{'...' if len(response7) > 200 else ''}")
+
+    # mediaplan_tools.save_mediaplan
+
+    response8 = debugger.chat_with_agent("Save this media plan")
+    print(f"\nResponse 8: {response8[:200]}{'...' if len(response8) > 200 else ''}")
+    exit()
 
     response3 = debugger.chat_with_agent("Add line items for Facebook and Google with strategic budget allocation then save the media plan")
     print(f"\nResponse 3: {response3[:200]}{'...' if len(response3) > 200 else ''}")
