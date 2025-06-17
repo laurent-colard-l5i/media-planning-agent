@@ -562,62 +562,190 @@ def get_workspace_info(session_state, **kwargs) -> Dict[str, Any]:
             error=str(e)
         )
 
+
 def list_campaigns(
-    session_state,
-    include_stats: bool = True,
-    limit: Optional[int] = None,
-    **kwargs
+        session_state,
+        include_stats: bool = True,
+        limit: Optional[int] = None,
+        filters: Optional[Dict[str, Any]] = None,
+        **kwargs
 ) -> Dict[str, Any]:
     """
-    List campaigns in the workspace.
+    List campaigns in the workspace with optional filtering.
 
     Args:
         session_state: Current session state
         include_stats: Whether to include campaign statistics
-        limit: Maximum number of campaigns to return
+        limit: Maximum number of campaigns to return (optional)
+        filters: Dictionary of filters to apply. Supports multiple filter types:
+                - Exact match: {"field": "value"}
+                - List/IN match: {"field": ["value1", "value2"]}
+                - Range filter: {"field": {"min": 100, "max": 500}}
+                - Regex filter: {"field": {"regex": "pattern"}}
         **kwargs: Additional arguments (ignored for compatibility)
 
     Returns:
-        Success/error result with campaign list
+        Success/error result with filtered campaign list
     """
     if not session_state.workspace_manager:
         return create_error_result(
-            "❌ No workspace loaded. Please load a workspace first."
+            "❌ No workspace loaded. Please load a workspace first using the load_workspace tool."
         )
 
     try:
-        logger.info("Listing campaigns in workspace")
+        logger.info(f"Listing campaigns in workspace with filters: {filters}")
 
-        # Get campaigns using MediaPlanPy SDK
+        # Validate filters if provided (reuse helper from list_mediaplans)
+        if filters:
+            validation_result = _validate_filters(filters)
+            if not validation_result["valid"]:
+                return create_error_result(
+                    f"❌ Invalid filter format: {validation_result['error']}",
+                    error=validation_result['error'],
+                    filter_examples=_get_campaign_filter_examples()
+                )
+
+        # Get campaigns using MediaPlanPy SDK with filters
         campaigns = session_state.workspace_manager.list_campaigns(
+            filters=filters,
             include_stats=include_stats,
             return_dataframe=False
         )
 
-        # Apply limit if specified
+        # Apply limit if specified (post-filtering)
+        original_count = len(campaigns)
         if limit and len(campaigns) > limit:
             campaigns = campaigns[:limit]
-            limited_msg = f" (showing first {limit})"
+            limited_msg = f" (showing first {limit} of {original_count})"
         else:
             limited_msg = ""
 
+        # Create filter summary for user feedback
+        filter_summary = ""
+        if filters:
+            filter_parts = []
+            for field, filter_value in filters.items():
+                if isinstance(filter_value, list):
+                    filter_parts.append(f"{field} in {filter_value}")
+                elif isinstance(filter_value, dict):
+                    if 'min' in filter_value and 'max' in filter_value:
+                        filter_parts.append(f"{field} between {filter_value['min']} and {filter_value['max']}")
+                    elif 'min' in filter_value:
+                        filter_parts.append(f"{field} >= {filter_value['min']}")
+                    elif 'max' in filter_value:
+                        filter_parts.append(f"{field} <= {filter_value['max']}")
+                    elif 'regex' in filter_value:
+                        filter_parts.append(f"{field} matches '{filter_value['regex']}'")
+                else:
+                    filter_parts.append(f"{field} = {filter_value}")
+
+            if filter_parts:
+                filter_summary = f"\n🔍 Applied filters: {', '.join(filter_parts)}"
+
+        # Format response based on number of campaigns
         if not campaigns:
-            return create_success_result(
-                "📋 No campaigns found in workspace.",
-                campaigns=[],
-                count=0
-            )
+            if filters:
+                return create_success_result(
+                    f"📋 No campaigns found matching the specified filters.{filter_summary}" +
+                    "\n💡 Try adjusting your filter criteria or use 'list_campaigns' without filters to see all campaigns.",
+                    campaigns=[],
+                    count=0,
+                    filters_applied=filters
+                )
+            else:
+                return create_success_result(
+                    "📋 No campaigns found in workspace. Create your first media plan to see campaigns here.",
+                    campaigns=[],
+                    count=0
+                )
+
+        # Format campaign information for display
+        campaign_summaries = []
+        for campaign in campaigns:
+            summary = {
+                "id": campaign.get("campaign_id", "Unknown"),
+                "name": campaign.get("campaign_name", "Unnamed"),
+                "objective": campaign.get("campaign_objective", "Unknown"),
+                "budget": campaign.get("campaign_budget_total", 0),
+                "start_date": campaign.get("campaign_start_date", "Unknown"),
+                "end_date": campaign.get("campaign_end_date", "Unknown")
+            }
+
+            # Add statistics if available
+            if include_stats:
+                # Basic stats
+                summary.update({
+                    "media_plan_count": campaign.get("stat_media_plan_count", 0),
+                    "lineitem_count": campaign.get("stat_lineitem_count", 0),
+                    "total_cost": campaign.get("stat_total_cost", 0),
+                    "allocated_budget": campaign.get("stat_total_cost", 0),  # Alias for clarity
+                    "remaining_budget": max(0, summary["budget"] - campaign.get("stat_total_cost", 0)),
+                    "last_updated": campaign.get("stat_last_updated", "Unknown")
+                })
+
+                # Timeline stats
+                if campaign.get("stat_min_start_date"):
+                    summary["earliest_start"] = campaign["stat_min_start_date"]
+                if campaign.get("stat_max_end_date"):
+                    summary["latest_end"] = campaign["stat_max_end_date"]
+
+                # Channel diversity and dimension stats
+                channel_stats = {}
+                dimension_fields = ['channel', 'vehicle', 'partner', 'media_product', 'adformat', 'kpi',
+                                    'location_name']
+
+                for dim in dimension_fields:
+                    count_field = f"stat_distinct_{dim}_count"
+                    if campaign.get(count_field, 0) > 0:
+                        channel_stats[f"distinct_{dim}s"] = campaign[count_field]
+
+                if channel_stats:
+                    summary["channel_diversity"] = channel_stats
+
+                # Performance indicators (if campaign has line items)
+                if summary["lineitem_count"] > 0:
+                    summary["avg_cost_per_lineitem"] = summary["total_cost"] / summary["lineitem_count"]
+                    summary["budget_utilization"] = (summary["total_cost"] / summary["budget"] * 100) if summary[
+                                                                                                             "budget"] > 0 else 0
+
+            campaign_summaries.append(summary)
+
+        success_message = f"✅ Found {len(campaigns)} campaign(s){limited_msg}"
+        if filter_summary:
+            success_message += filter_summary
+
+        logger.info(f"Successfully listed {len(campaigns)} campaigns with filters applied")
 
         return create_success_result(
-            f"✅ Found {len(campaigns)} campaign(s){limited_msg}",
-            campaigns=campaigns,
+            success_message,
+            campaigns=campaign_summaries,
             count=len(campaigns),
-            has_more=limit and len(campaigns) >= limit
+            original_count=original_count if limit else len(campaigns),
+            has_more=limit and original_count > limit,
+            filters_applied=filters
         )
 
     except Exception as e:
         logger.error(f"Error listing campaigns: {e}")
         return create_error_result(
             f"❌ Failed to list campaigns: {str(e)}",
-            error=str(e)
+            error=str(e),
+            filters_applied=filters
         )
+
+
+def _get_campaign_filter_examples() -> Dict[str, Any]:
+    """Get example filter formats specific to campaigns."""
+    return {
+        "exact_match": {"campaign_objective": "awareness"},
+        "list_match": {"campaign_objective": ["awareness", "consideration"]},
+        "range_filter": {"campaign_budget_total": {"min": 50000, "max": 200000}},
+        "regex_filter": {"campaign_name": {"regex": ".*Q[1-4].*"}},
+        "date_range": {"campaign_start_date": {"min": "2025-01-01", "max": "2025-12-31"}},
+        "performance_filter": {"stat_lineitem_count": {"min": 5}},
+        "combined": {
+            "campaign_objective": ["awareness", "consideration"],
+            "campaign_budget_total": {"min": 100000},
+            "stat_distinct_channel_count": {"min": 3}
+        }
+    }

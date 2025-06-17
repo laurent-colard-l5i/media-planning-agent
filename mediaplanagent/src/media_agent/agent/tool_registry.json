@@ -13,7 +13,6 @@
         "category": "workspace",
         "priority": 1,
         "description": "Load and validate MediaPlanPy workspace configuration using either workspace ID or file path. Supports automatic workspace discovery. Required before any media plan operations.",
-
         "parameters": {
           "workspace_path": {
             "type": "string",
@@ -37,10 +36,14 @@
             ]
           }
         },
-
-        "prerequisites": ["none"],
-        "enables": ["list_mediaplans", "create_mediaplan_basic", "list_campaigns"],
-
+        "prerequisites": [
+          "none"
+        ],
+        "enables": [
+          "list_mediaplans",
+          "create_mediaplan_basic",
+          "list_campaigns"
+        ],
         "triggers": {
           "user_intents": [
             "load workspace",
@@ -78,14 +81,12 @@
           ]
         }
       },
-
       "list_mediaplans": {
         "function_name": "list_mediaplans",
         "module_path": "media_agent.tools.workspace_tools",
         "category": "workspace",
         "priority": 2,
         "description": "List all media plans in workspace with detailed information, statistics, and powerful filtering capabilities. Supports exact match, range, list, and regex filters.",
-
         "parameters": {
           "include_stats": {
             "type": "boolean",
@@ -116,9 +117,16 @@
                   {
                     "type": "object",
                     "properties": {
-                      "min": {"description": "Minimum value for range filter"},
-                      "max": {"description": "Maximum value for range filter"},
-                      "regex": {"type": "string", "description": "Regular expression pattern"}
+                      "min": {
+                        "description": "Minimum value for range filter"
+                      },
+                      "max": {
+                        "description": "Maximum value for range filter"
+                      },
+                      "regex": {
+                        "type": "string",
+                        "description": "Regular expression pattern"
+                      }
                     },
                     "description": "Range filter (min/max) or regex pattern filter"
                   }
@@ -128,43 +136,72 @@
             "examples": [
               {
                 "description": "Find awareness campaigns only",
-                "value": {"campaign_objective": "awareness"}
+                "value": {
+                  "campaign_objective": "awareness"
+                }
               },
               {
                 "description": "Find campaigns with specific objectives",
-                "value": {"campaign_objective": ["awareness", "consideration"]}
+                "value": {
+                  "campaign_objective": [
+                    "awareness",
+                    "consideration"
+                  ]
+                }
               },
               {
                 "description": "Find high-budget campaigns",
-                "value": {"campaign_budget_total": {"min": 100000}}
+                "value": {
+                  "campaign_budget_total": {
+                    "min": 100000
+                  }
+                }
               },
               {
                 "description": "Find campaigns in budget range",
-                "value": {"campaign_budget_total": {"min": 50000, "max": 200000}}
+                "value": {
+                  "campaign_budget_total": {
+                    "min": 50000,
+                    "max": 200000
+                  }
+                }
               },
               {
                 "description": "Find campaigns by name pattern",
-                "value": {"campaign_name": {"regex": ".*Summer.*"}}
+                "value": {
+                  "campaign_name": {
+                    "regex": ".*Summer.*"
+                  }
+                }
               },
               {
                 "description": "Find recent campaigns",
-                "value": {"campaign_start_date": {"min": "2025-01-01"}}
+                "value": {
+                  "campaign_start_date": {
+                    "min": "2025-01-01"
+                  }
+                }
               },
               {
                 "description": "Combined filters",
                 "value": {
-                  "campaign_objective": ["awareness", "consideration"],
-                  "campaign_budget_total": {"min": 75000},
+                  "campaign_objective": [
+                    "awareness",
+                    "consideration"
+                  ],
+                  "campaign_budget_total": {
+                    "min": 75000
+                  },
                   "meta_created_by_name": "john@company.com"
                 }
               }
             ]
           }
         },
-
-        "prerequisites": ["workspace_loaded"],
+        "prerequisites": [
+          "workspace_loaded"
+        ],
         "enables": [],
-
         "common_filter_fields": {
           "campaign_fields": [
             "campaign_name",
@@ -187,60 +224,199 @@
           ]
         }
       },
-
-      "validate_mediaplan": {
-        "function_name": "validate_mediaplan",
+      "list_campaigns": {
+        "function_name": "list_campaigns",
         "module_path": "media_agent.tools.workspace_tools",
         "category": "workspace",
-        "priority": 3,
-        "description": "Validate the current media plan against schema and business rules.",
-
-        "parameters": {},
-
-        "prerequisites": ["workspace_loaded", "current_mediaplan_exists"],
-        "enables": []
+        "priority": 5,
+        "description": "List all campaigns across media plans in workspace with statistics and powerful filtering capabilities. Provides campaign-level overview with performance metrics and channel diversity analysis.",
+        "parameters": {
+          "include_stats": {
+            "type": "boolean",
+            "required": false,
+            "default": true,
+            "description": "Include campaign statistics like media plan count, line item count, budget utilization, and channel diversity metrics"
+          },
+          "limit": {
+            "type": "integer",
+            "required": false,
+            "description": "Maximum number of campaigns to return (applied after filtering)"
+          },
+          "filters": {
+            "type": "object",
+            "required": false,
+            "description": "Dictionary of filters to apply for campaign discovery and analysis. Supports multiple filter types for precise campaign insights.",
+            "properties": {
+              "field_name": {
+                "oneOf": [
+                  {
+                    "type": "string",
+                    "description": "Exact match filter"
+                  },
+                  {
+                    "type": "array",
+                    "description": "List/IN filter - matches any value in the list"
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "min": {
+                        "description": "Minimum value for range filter"
+                      },
+                      "max": {
+                        "description": "Maximum value for range filter"
+                      },
+                      "regex": {
+                        "type": "string",
+                        "description": "Regular expression pattern"
+                      }
+                    },
+                    "description": "Range filter (min/max) or regex pattern filter"
+                  }
+                ]
+              }
+            },
+            "examples": [
+              {
+                "description": "Find awareness campaigns only",
+                "value": {
+                  "campaign_objective": "awareness"
+                }
+              },
+              {
+                "description": "Find high-budget campaigns",
+                "value": {
+                  "campaign_budget_total": {
+                    "min": 100000
+                  }
+                }
+              },
+              {
+                "description": "Find campaigns with diverse channel mix",
+                "value": {
+                  "stat_distinct_channel_count": {
+                    "min": 3
+                  }
+                }
+              },
+              {
+                "description": "Find quarterly campaigns",
+                "value": {
+                  "campaign_name": {
+                    "regex": ".*Q[1-4].*"
+                  }
+                }
+              },
+              {
+                "description": "Find underutilized campaigns",
+                "value": {
+                  "stat_lineitem_count": {
+                    "max": 2
+                  },
+                  "campaign_budget_total": {
+                    "min": 50000
+                  }
+                }
+              },
+              {
+                "description": "Find high-performing campaigns",
+                "value": {
+                  "stat_lineitem_count": {
+                    "min": 5
+                  },
+                  "stat_distinct_channel_count": {
+                    "min": 3
+                  },
+                  "stat_total_cost": {
+                    "min": 75000
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "prerequisites": [
+          "workspace_loaded"
+        ],
+        "enables": [],
+        "common_filter_fields": {
+          "campaign_core": [
+            "campaign_id",
+            "campaign_name",
+            "campaign_objective",
+            "campaign_budget_total",
+            "campaign_start_date",
+            "campaign_end_date"
+          ],
+          "performance_metrics": [
+            "stat_media_plan_count",
+            "stat_lineitem_count",
+            "stat_total_cost",
+            "stat_last_updated"
+          ],
+          "diversity_metrics": [
+            "stat_distinct_channel_count",
+            "stat_distinct_vehicle_count",
+            "stat_distinct_partner_count",
+            "stat_distinct_adformat_count"
+          ],
+          "timeline_metrics": [
+            "stat_min_start_date",
+            "stat_max_end_date"
+          ]
+        }
       },
-
       "get_workspace_info": {
         "function_name": "get_workspace_info",
         "module_path": "media_agent.tools.workspace_tools",
         "category": "workspace",
         "priority": 4,
         "description": "Get detailed information about current workspace configuration and status.",
-
         "parameters": {},
-
-        "prerequisites": ["workspace_loaded"],
+        "prerequisites": [
+          "workspace_loaded"
+        ],
         "enables": []
       },
-
-      "list_campaigns": {
-        "function_name": "list_campaigns",
+      "validate_mediaplan": {
+        "function_name": "validate_mediaplan",
         "module_path": "media_agent.tools.workspace_tools",
         "category": "workspace",
-        "priority": 5,
-        "description": "List all campaigns across media plans in workspace with statistics.",
-
-        "parameters": {
-          "include_stats": {
-            "type": "boolean",
-            "required": false,
-            "default": true,
-            "description": "Include campaign statistics and metrics"
-          },
-          "limit": {
-            "type": "integer",
-            "required": false,
-            "description": "Maximum number of campaigns to return"
-          }
-        },
-
-        "prerequisites": ["workspace_loaded"],
+        "priority": 3,
+        "description": "Validate the current media plan against schema and business rules.",
+        "parameters": {},
+        "prerequisites": [
+          "workspace_loaded",
+          "current_mediaplan_exists"
+        ],
         "enables": []
       }
     },
 
     "mediaplan_tools": {
+      "load_mediaplan": {
+        "function_name": "load_mediaplan",
+        "module_path": "media_agent.tools.mediaplan_tools",
+        "category": "mediaplan",
+        "priority": 3,
+        "description": "Load existing media plan from workspace by ID or path. Returns complete media plan structure including all line items, campaign details, and metadata.",
+
+        "parameters": {
+          "media_plan_id": {
+            "type": "string",
+            "required": false,
+            "description": "Unique identifier of media plan to load (preferred method)"
+          },
+          "path": {
+            "type": "string",
+            "required": false,
+            "description": "Path to media plan file (alternative to ID)"
+          }
+        },
+
+        "prerequisites": ["workspace_loaded"],
+        "enables": ["create_lineitem", "save_mediaplan", "validate_mediaplan"]
+      },
       "create_mediaplan_basic": {
         "function_name": "create_mediaplan_basic",
         "module_path": "media_agent.tools.mediaplan_tools",
@@ -300,87 +476,7 @@
         "prerequisites": ["workspace_loaded"],
         "enables": ["create_lineitem", "save_mediaplan", "validate_mediaplan"]
       },
-
-      "save_mediaplan": {
-        "function_name": "save_mediaplan",
-        "module_path": "media_agent.tools.mediaplan_tools",
-        "category": "mediaplan",
-        "priority": 2,
-        "description": "Save current media plan to workspace storage with optional strategic summary.",
-
-        "parameters": {
-          "include_strategic_summary": {
-            "type": "boolean",
-            "required": false,
-            "default": true,
-            "description": "Whether to include strategic context in comments field"
-          },
-          "path": {
-            "type": "string",
-            "required": false,
-            "description": "Optional custom path for saving (uses default if not provided)"
-          },
-          "overwrite": {
-            "type": "boolean",
-            "required": false,
-            "default": true,
-            "description": "Whether to overwrite existing files"
-          }
-        },
-
-        "prerequisites": ["workspace_loaded", "current_mediaplan_exists"],
-        "enables": []
-      },
-
-      "load_mediaplan": {
-        "function_name": "load_mediaplan",
-        "module_path": "media_agent.tools.mediaplan_tools",
-        "category": "mediaplan",
-        "priority": 3,
-        "description": "Load existing media plan from workspace by ID or path. Returns complete media plan structure including all line items, campaign details, and metadata.",
-
-        "parameters": {
-          "media_plan_id": {
-            "type": "string",
-            "required": false,
-            "description": "Unique identifier of media plan to load (preferred method)"
-          },
-          "path": {
-            "type": "string",
-            "required": false,
-            "description": "Path to media plan file (alternative to ID)"
-          }
-        },
-
-        "prerequisites": ["workspace_loaded"],
-        "enables": ["create_lineitem", "save_mediaplan", "validate_mediaplan"]
-      },
-
-      "delete_mediaplan": {
-        "function_name": "delete_mediaplan",
-        "module_path": "media_agent.tools.mediaplan_tools",
-        "category": "mediaplan",
-        "priority": 4,
-        "description": "Delete media plan by ID. Requires explicit confirmation for safety.",
-
-        "parameters": {
-          "media_plan_id": {
-            "type": "string",
-            "required": true,
-            "description": "Unique identifier of media plan to delete"
-          },
-          "confirm_deletion": {
-            "type": "boolean",
-            "required": true,
-            "description": "Must be true to confirm deletion. Safety mechanism."
-          }
-        },
-
-        "prerequisites": ["workspace_loaded"],
-        "enables": []
-      },
-
-        "create_lineitem": {
+      "create_lineitem": {
           "function_name": "create_lineitem",
           "module_path": "media_agent.tools.mediaplan_tools",
           "category": "mediaplan",
@@ -433,7 +529,60 @@
             ],
             "prerequisites": ["strategic_consultation_completed"]
           }
-        }
+        },
+      "save_mediaplan": {
+        "function_name": "save_mediaplan",
+        "module_path": "media_agent.tools.mediaplan_tools",
+        "category": "mediaplan",
+        "priority": 2,
+        "description": "Save current media plan to workspace storage with optional strategic summary.",
+
+        "parameters": {
+          "include_strategic_summary": {
+            "type": "boolean",
+            "required": false,
+            "default": true,
+            "description": "Whether to include strategic context in comments field"
+          },
+          "path": {
+            "type": "string",
+            "required": false,
+            "description": "Optional custom path for saving (uses default if not provided)"
+          },
+          "overwrite": {
+            "type": "boolean",
+            "required": false,
+            "default": true,
+            "description": "Whether to overwrite existing files"
+          }
+        },
+
+        "prerequisites": ["workspace_loaded", "current_mediaplan_exists"],
+        "enables": []
+      },
+      "delete_mediaplan": {
+        "function_name": "delete_mediaplan",
+        "module_path": "media_agent.tools.mediaplan_tools",
+        "category": "mediaplan",
+        "priority": 4,
+        "description": "Delete media plan by ID. Requires explicit confirmation for safety.",
+
+        "parameters": {
+          "media_plan_id": {
+            "type": "string",
+            "required": true,
+            "description": "Unique identifier of media plan to delete"
+          },
+          "confirm_deletion": {
+            "type": "boolean",
+            "required": true,
+            "description": "Must be true to confirm deletion. Safety mechanism."
+          }
+        },
+
+        "prerequisites": ["workspace_loaded"],
+        "enables": []
+      }
     }
   },
 

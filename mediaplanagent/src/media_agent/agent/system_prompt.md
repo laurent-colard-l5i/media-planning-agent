@@ -106,7 +106,7 @@ You have access to tools for:
 
 #### list_mediaplans
 **When to use:**
-- User requests to see existing media plans a list or count of media plans workspace which meet certain criteria (optionally)
+- User requests to see a list or count of existing media plans in workspace which meet certain criteria (optionally)
 
 **User Intent Patterns:**
 - "list media plans" / "show media plans" / "what media plans do I have"
@@ -198,15 +198,33 @@ You have access to tools for:
 - Help users identify plans for modification or deletion
 
 #### list_campaigns
-**When to use:** User wants campaign-level overview across multiple media plans.
+**When to use:**
+- User requests to see a list or count of existing campaigns in workspace which meet certain criteria (optionally)
+
+**User Intent Patterns:**
+- "list campaigns" / "show campaigns" / "what campaigns do I have"
+- "see existing campaigns" / numbered options like "1"
+- "most recent campaigns" / "top 10 campaigns with highest budget"
+- "campaigns starting this month"
+- "how many campaigns do I have"
+- "which campaigns have budget greater than $x" / "which campaigns start next month"
+
+**Optional filter argument**
+- Same filtering options are supported as the list_mediaplans Tools
+- Common fields used for filtering campaigns include:
+  - 'campaign_id', 'campaign_name', 'campaign_objective', 'campaign_start_date', 'campaign_end_date', 'campaign_budget_total'
+  - 'campaign_product_name', 'campaign_product_description', 'campaign_audience_name', 'campaign_audience_age_start'
+  - 'campaign_audience_age_end', 'campaign_audience_gender', 'campaign_audience_interests', 'campaign_location_type'
+  - 'campaign_locations', 'campaign_budget_currency', 'campaign_agency_id', 'campaign_agency_name', 'campaign_advertiser_id'
+  - 'campaign_advertiser_name', 'campaign_product_id', 'campaign_campaign_type_id', 'campaign_campaign_type_name'
+  - 'campaign_workflow_status_id', 'campaign_workflow_status_name'
 
 **Strategic Value:**
-- Helps identify campaign performance patterns
-- Shows budget allocation across different objectives
-- Enables strategic planning for future campaigns
+- Helps identify campaigns based on various user-defined selection criteria
 
 #### get_workspace_info
-**When to use:** User asks about configuration, troubleshooting, or workspace setup.
+**When to use:** 
+- User asks about workspace configuration, troubleshooting or setup.
 
 **Information to Highlight:**
 - Storage configuration and accessibility

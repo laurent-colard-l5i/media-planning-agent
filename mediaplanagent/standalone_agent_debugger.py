@@ -764,21 +764,40 @@ def run_debug_scenario_conversation():
     # 🔴 BREAKPOINT: Set breakpoint here to debug each conversation turn
     print("\n2. Testing conversation flow...")
 
-    # Load Workspace
+    # workspace_tools.load_workspace
 
     # response1 = debugger.chat_with_agent("Load my workspace from C:\mediaplanpy\workspace_c990700e_settings.json")
-    # print(f"\nResponse 1: {response1[:200]}{'...' if len(response1) > 200 else ''}")
-    #
     # response1 = debugger.chat_with_agent("load workspace workspace_c990700e")
-    # print(f"\nResponse 1: {response1[:200]}{'...' if len(response1) > 200 else ''}")
-
     response1 = debugger.chat_with_agent("load workspace")
     print(f"\nResponse 1: {response1[:200]}{'...' if len(response1) > 200 else ''}")
 
-    # List Media Plans
+    # workspace_tools.list_mediaplans
 
-    response2 = debugger.chat_with_agent("List media plans")
-    print(f"\nResponse 2: {response2[:200]}{'...' if len(response2) > 200 else ''}")
+    # response2 = debugger.chat_with_agent("List all media plans")
+    # response2 = debugger.chat_with_agent("List media plans with a budget greater than $100k")
+    # print(f"\nResponse 2: {response2[:200]}{'...' if len(response2) > 200 else ''}")
+
+    # workspace_tools.list_campaigns
+
+    # response3 = debugger.chat_with_agent("List my campaigns")
+    # response3 = debugger.chat_with_agent("List campaigns starting in Q3 25")
+    # print(f"\nResponse 3: {response3[:200]}{'...' if len(response3) > 200 else ''}")
+
+    # workspace_tools.get_workspace_info
+
+    # response4 = debugger.chat_with_agent("How is my workspace configured")
+    # print(f"\nResponse 4: {response4[:200]}{'...' if len(response4) > 200 else ''}")
+
+    # mediaplan_tools.load_mediaplan
+
+    response5 = debugger.chat_with_agent("Load media plan mediaplan_bfde4972")
+    print(f"\nResponse 5: {response5[:200]}{'...' if len(response5) > 200 else ''}")
+
+
+
+    # workspace_tools.validate_mediaplan
+    # LOGICAL ISSUE: This method requires a media plan to be loaded which itself validates the media plan
+    # Either we should deprecate this Tool or make it a media plan-level tool
 
     response3 = debugger.chat_with_agent("Add line items for Facebook and Google with strategic budget allocation then save the media plan")
     print(f"\nResponse 3: {response3[:200]}{'...' if len(response3) > 200 else ''}")
