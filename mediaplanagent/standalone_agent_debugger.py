@@ -21,6 +21,7 @@ from datetime import datetime
 import codecs
 import ctypes
 
+
 # Add src to Python path so we can import the agent
 project_root = Path(__file__).parent
 src_path = project_root / "src"
@@ -40,6 +41,33 @@ except ImportError as e:
     print(f"❌ Import failed: {e}")
     print("Make sure you're running this from the project root directory")
     sys.exit(1)
+
+# Load environment variables from .env file
+try:
+    from dotenv import load_dotenv
+
+    # Find .env file - it should be in the project root
+    project_root = Path(__file__).parent
+    env_file = project_root / ".env"
+
+    if env_file.exists():
+        load_dotenv(env_file)
+        print(f"✅ Loaded environment variables from: {env_file}")
+
+        # Verify the workspace path was loaded
+        workspace_path = os.getenv('MEDIAPLANPY_WORKSPACE_PATH')
+        if workspace_path:
+            print(f"📍 MEDIAPLANPY_WORKSPACE_PATH: {workspace_path}")
+        else:
+            print("⚠️ MEDIAPLANPY_WORKSPACE_PATH not found in .env file")
+    else:
+        print(f"⚠️ .env file not found at: {env_file}")
+        print("Environment variables will not be automatically loaded")
+
+except ImportError:
+    print("⚠️ python-dotenv not available. Install with: pip install python-dotenv")
+except Exception as e:
+    print(f"⚠️ Failed to load .env file: {e}")
 
 
 class SafeConsoleHandler(logging.StreamHandler):
@@ -736,11 +764,20 @@ def run_debug_scenario_conversation():
     # 🔴 BREAKPOINT: Set breakpoint here to debug each conversation turn
     print("\n2. Testing conversation flow...")
 
+    # Load Workspace
+
     # response1 = debugger.chat_with_agent("Load my workspace from C:\mediaplanpy\workspace_c990700e_settings.json")
-    response1 = debugger.chat_with_agent("load workspace workspace_c990700e")
+    # print(f"\nResponse 1: {response1[:200]}{'...' if len(response1) > 200 else ''}")
+    #
+    # response1 = debugger.chat_with_agent("load workspace workspace_c990700e")
+    # print(f"\nResponse 1: {response1[:200]}{'...' if len(response1) > 200 else ''}")
+
+    response1 = debugger.chat_with_agent("load workspace")
     print(f"\nResponse 1: {response1[:200]}{'...' if len(response1) > 200 else ''}")
 
-    response2 = debugger.chat_with_agent("I am planning a campaign in Q325 which will be targeting car purchasers in New York State with a total budget of $250,000, with the objective to drive awareness and consideration. Please assign a name and a description based on this brief. My email address is lc@planmatic.io")
+    # List Media Plans
+
+    response2 = debugger.chat_with_agent("List media plans")
     print(f"\nResponse 2: {response2[:200]}{'...' if len(response2) > 200 else ''}")
 
     response3 = debugger.chat_with_agent("Add line items for Facebook and Google with strategic budget allocation then save the media plan")
@@ -822,9 +859,9 @@ if __name__ == "__main__":
                 run_debug_scenario_basic_workflow()
 
             elif choice == "2":
-                print(f"\n🔴 SET BREAKPOINTS in run_debug_scenario_conversation() function")
-                print(f"Then press F5 or your IDE's debug button")
-                input("Press Enter when ready...")
+                # print(f"\n🔴 SET BREAKPOINTS in run_debug_scenario_conversation() function")
+                # print(f"Then press F5 or your IDE's debug button")
+                # input("Press Enter when ready...")
                 run_debug_scenario_conversation()
 
             elif choice == "3":
