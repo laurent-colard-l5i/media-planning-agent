@@ -736,7 +736,8 @@ def run_debug_scenario_conversation():
     # 🔴 BREAKPOINT: Set breakpoint here to debug each conversation turn
     print("\n2. Testing conversation flow...")
 
-    response1 = debugger.chat_with_agent("Load my workspace from C:\mediaplanpy\workspace_c990700e_settings.json")
+    # response1 = debugger.chat_with_agent("Load my workspace from C:\mediaplanpy\workspace_c990700e_settings.json")
+    response1 = debugger.chat_with_agent("load workspace workspace_c990700e")
     print(f"\nResponse 1: {response1[:200]}{'...' if len(response1) > 200 else ''}")
 
     response2 = debugger.chat_with_agent("I am planning a campaign in Q325 which will be targeting car purchasers in New York State with a total budget of $250,000, with the objective to drive awareness and consideration. Please assign a name and a description based on this brief. My email address is lc@planmatic.io")

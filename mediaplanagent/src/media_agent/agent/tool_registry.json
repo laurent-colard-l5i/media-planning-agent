@@ -12,18 +12,71 @@
         "module_path": "media_agent.tools.workspace_tools",
         "category": "workspace",
         "priority": 1,
-        "description": "Load and validate MediaPlanPy workspace configuration. Required before any media plan operations.",
+        "description": "Load and validate MediaPlanPy workspace configuration using either workspace ID or file path. Supports automatic workspace discovery. Required before any media plan operations.",
 
         "parameters": {
           "workspace_path": {
             "type": "string",
             "required": false,
-            "description": "Path to workspace.json file. Uses environment variable or default locations if not provided."
+            "description": "Direct path to workspace.json configuration file. Use this when you have the exact file location.",
+            "examples": [
+              "/path/to/workspace.json",
+              "C:\\Users\\user\\workspace_settings.json",
+              "./config/my_workspace.json"
+            ]
+          },
+          "workspace_id": {
+            "type": "string",
+            "required": false,
+            "description": "Workspace identifier for automatic file discovery. The SDK will locate the corresponding workspace file using configured storage locations.",
+            "examples": [
+              "my-workspace-001",
+              "prod-workspace",
+              "test-workspace-2024",
+              "workspace_c990700e"
+            ]
           }
         },
 
         "prerequisites": ["none"],
-        "enables": ["list_mediaplans", "create_mediaplan_basic", "list_campaigns"]
+        "enables": ["list_mediaplans", "create_mediaplan_basic", "list_campaigns"],
+
+        "triggers": {
+          "user_intents": [
+            "load workspace",
+            "load my workspace",
+            "initialize workspace",
+            "start session",
+            "load workspace {workspace_id}",
+            "use workspace {workspace_id}",
+            "switch to workspace {workspace_id}",
+            "open workspace {workspace_id}",
+            "connect to workspace"
+          ],
+          "parameter_patterns": [
+            {
+              "pattern": "load workspace (\\w+)",
+              "extracts": {
+                "workspace_id": 1
+              },
+              "description": "Extract workspace ID from 'load workspace {id}' pattern"
+            },
+            {
+              "pattern": "use workspace ([\\w-]+)",
+              "extracts": {
+                "workspace_id": 1
+              },
+              "description": "Extract workspace ID from 'use workspace {id}' pattern"
+            },
+            {
+              "pattern": "workspace ([\\w-]+)",
+              "extracts": {
+                "workspace_id": 1
+              },
+              "description": "Extract workspace ID from 'workspace {id}' pattern"
+            }
+          ]
+        }
       },
 
       "list_mediaplans": {

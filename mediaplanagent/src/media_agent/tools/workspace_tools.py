@@ -15,28 +15,69 @@ from .base import register_tool, create_success_result, create_error_result
 
 logger = logging.getLogger(__name__)
 
-def load_workspace(session_state, workspace_path: Optional[str] = None, **kwargs) -> Dict[str, Any]:
+
+def load_workspace(
+        session_state,
+        workspace_path: Optional[str] = None,
+        workspace_id: Optional[str] = None,
+        **kwargs
+) -> Dict[str, Any]:
     """
     Load workspace configuration and store in session state.
+    Supports both direct path loading and workspace ID-based loading.
 
     Args:
         session_state: Current session state
-        workspace_path: Path to workspace.json file (optional, will use environment variable or default locations if not provided)
+        workspace_path: Direct path to workspace.json file (optional)
+        workspace_id: Workspace ID for automatic file discovery (optional)
         **kwargs: Additional arguments (ignored for compatibility)
 
     Returns:
         Success/error result with workspace information
     """
-    try:
-        # If no workspace_path provided, try environment variable
-        if not workspace_path:
-            workspace_path = os.getenv('MEDIAPLANPY_WORKSPACE_PATH')
+    # Validate input parameters
+    if workspace_path and workspace_id:
+        return create_error_result(
+            "❌ Please provide either workspace_path OR workspace_id, not both.",
+            error="Conflicting parameters"
+        )
 
-        logger.info(f"Loading workspace from path: {workspace_path or 'default locations'}")
+    try:
+        # Determine loading method and log appropriately
+        if workspace_id:
+            logger.info(f"Loading workspace by ID: {workspace_id}")
+            load_method = "workspace_id"
+            load_value = workspace_id
+        elif workspace_path:
+            logger.info(f"Loading workspace from path: {workspace_path}")
+            load_method = "workspace_path"
+            load_value = workspace_path
+        else:
+            # Neither provided - try environment variable for path, then fall back to SDK defaults
+            env_workspace_path = os.getenv('MEDIAPLANPY_WORKSPACE_PATH')
+            if env_workspace_path:
+                logger.info(f"Loading workspace from environment variable: {env_workspace_path}")
+                load_method = "workspace_path"
+                load_value = env_workspace_path
+            else:
+                logger.info("Loading workspace using SDK default discovery")
+                load_method = "default"
+                load_value = None
 
         # Create workspace manager
         manager = WorkspaceManager()
-        manager.load(workspace_path=workspace_path)
+
+        # Call SDK load method with appropriate parameters
+        if load_method == "workspace_id":
+            manager.load(workspace_id=workspace_id)
+            loaded_from = f"workspace ID: {workspace_id}"
+        elif load_method == "workspace_path":
+            manager.load(workspace_path=load_value)
+            loaded_from = f"path: {load_value}"
+        else:
+            # Default discovery - let SDK handle it
+            manager.load()
+            loaded_from = "SDK auto-discovery"
 
         # Get resolved configuration
         config = manager.get_resolved_config()
@@ -44,8 +85,9 @@ def load_workspace(session_state, workspace_path: Optional[str] = None, **kwargs
         # Validate workspace
         if not manager.validate():
             return create_error_result(
-                "❌ Workspace configuration is invalid",
-                error="Workspace validation failed"
+                "❌ Workspace configuration is invalid. Please check your workspace settings.",
+                error="Workspace validation failed",
+                loaded_from=loaded_from
             )
 
         # Store in session state
@@ -60,41 +102,82 @@ def load_workspace(session_state, workspace_path: Optional[str] = None, **kwargs
             "database_enabled": config.get('database', {}).get('enabled', False),
             "status": config.get('workspace_status', 'Unknown'),
             "schema_version": config.get('schema_settings', {}).get('preferred_version', 'Unknown'),
-            "loaded_from": workspace_path or "default locations"
+            "loaded_from": loaded_from,
+            "loading_method": load_method
         }
 
-        logger.info(f"Successfully loaded workspace: {workspace_info['name']}")
+        # Create success message based on loading method
+        if load_method == "workspace_id":
+            success_msg = f"✅ Loaded workspace '{workspace_info['name']}' (ID: {workspace_info['id']}) successfully!"
+        elif workspace_path:
+            success_msg = f"✅ Loaded workspace '{workspace_info['name']}' from specified path successfully!"
+        elif load_value:  # Environment variable
+            success_msg = f"✅ Loaded workspace '{workspace_info['name']}' from environment configuration successfully!"
+        else:
+            success_msg = f"✅ Discovered and loaded workspace '{workspace_info['name']}' automatically!"
+
+        # Add configuration details to message
+        success_msg += f" Environment: {workspace_info['environment']}, "
+        success_msg += f"Storage: {workspace_info['storage_mode']}, "
+        success_msg += f"Database: {'enabled' if workspace_info['database_enabled'] else 'disabled'}"
+
+        logger.info(f"Successfully loaded workspace: {workspace_info['name']} via {load_method}")
 
         return create_success_result(
-            f"✅ Loaded workspace '{workspace_info['name']}' successfully! " +
-            f"Environment: {workspace_info['environment']}, " +
-            f"Storage: {workspace_info['storage_mode']}, " +
-            f"Database: {'enabled' if workspace_info['database_enabled'] else 'disabled'}",
+            success_msg,
             workspace_info=workspace_info,
             config_summary=workspace_info
         )
 
     except WorkspaceNotFoundError as e:
-        error_msg = "❌ Workspace configuration file not found"
-        if workspace_path:
-            error_msg += f" at {workspace_path}"
+        # Enhanced error messaging based on loading method
+        if workspace_id:
+            error_msg = f"❌ Workspace with ID '{workspace_id}' not found. "
+            error_msg += "Please verify the workspace ID is correct and the workspace exists in your configured storage locations."
+        elif workspace_path:
+            error_msg = f"❌ Workspace configuration file not found at '{workspace_path}'. "
+            error_msg += "Please verify the path is correct and the file exists."
         else:
-            error_msg += ". No workspace path provided and MEDIAPLANPY_WORKSPACE_PATH environment variable not set"
-        error_msg += ". Please provide a workspace path or set the MEDIAPLANPY_WORKSPACE_PATH environment variable."
+            error_msg = "❌ No workspace configuration found. "
+            if not os.getenv('MEDIAPLANPY_WORKSPACE_PATH'):
+                error_msg += "Try providing a workspace_id, workspace_path, or set the MEDIAPLANPY_WORKSPACE_PATH environment variable."
+            else:
+                error_msg += f"The environment path '{os.getenv('MEDIAPLANPY_WORKSPACE_PATH')}' does not contain a valid workspace."
 
-        return create_error_result(error_msg, error=str(e))
+        return create_error_result(
+            error_msg,
+            error=str(e),
+            loading_method=load_method,
+            attempted_value=load_value
+        )
 
     except WorkspaceError as e:
+        error_msg = f"❌ Workspace error"
+        if load_method == "workspace_id":
+            error_msg += f" loading workspace ID '{workspace_id}'"
+        elif load_value:
+            error_msg += f" loading from '{load_value}'"
+        error_msg += f": {str(e)}"
+
         return create_error_result(
-            f"❌ Workspace error: {str(e)}",
-            error=str(e)
+            error_msg,
+            error=str(e),
+            loading_method=load_method
         )
 
     except Exception as e:
-        logger.error(f"Unexpected error loading workspace: {e}")
+        logger.error(f"Unexpected error loading workspace via {load_method}: {e}")
+        error_msg = f"❌ Failed to load workspace"
+        if load_method == "workspace_id":
+            error_msg += f" with ID '{workspace_id}'"
+        elif load_value:
+            error_msg += f" from '{load_value}'"
+        error_msg += f": {str(e)}"
+
         return create_error_result(
-            f"❌ Failed to load workspace: {str(e)}",
-            error=str(e)
+            error_msg,
+            error=str(e),
+            loading_method=load_method
         )
 
 def list_mediaplans(
