@@ -802,23 +802,24 @@ def run_debug_scenario_conversation():
 
     # mediaplan_tools.create_mediaplan
 
-    response7 = debugger.chat_with_agent("I am planning a campaign in Q325 which will be targeting car purchasers in New York State with a total budget of $250,000, with the objective to drive awareness and consideration. Please assign a name and a description based on this brief. My name is Laurent Colard and my agency name is Level5i")
+    response7 = debugger.chat_with_agent("I am planning a campaign in Q325 which will be targeting car purchasers in the 10 largest States in the US by Population, with a total budget of $250,000, with the objective to drive awareness and consideration. Please assign a name and a description based on this brief. My name is Laurent Colard and my agency name is Level5i")
     print(f"\nResponse 7: {response7[:200]}{'...' if len(response7) > 200 else ''}")
+
+    # mediaplan_tools.create_lineitem
+
+    # response8 = debugger.chat_with_agent("Add line items by channel and by State with your recommended budget allocation, taking State-level population in consideration. Please include an estimated cost breakdown and estimated performance in terms of impressions, clicks and views wherever possible.")
+    # print(f"\nResponse 8: {response8[:200]}{'...' if len(response8) > 200 else ''}")
 
     # mediaplan_tools.save_mediaplan
 
-    response8 = debugger.chat_with_agent("Save this media plan")
-    print(f"\nResponse 8: {response8[:200]}{'...' if len(response8) > 200 else ''}")
-    exit()
+    response9 = debugger.chat_with_agent("Save this media plan")
+    print(f"\nResponse 9: {response9[:200]}{'...' if len(response9) > 200 else ''}")
 
-    response3 = debugger.chat_with_agent("Add line items for Facebook and Google with strategic budget allocation then save the media plan")
-    print(f"\nResponse 3: {response3[:200]}{'...' if len(response3) > 200 else ''}")
+    # mediaplan_tools.delete_mediaplan
 
-    response4 = debugger.chat_with_agent("Save the media plan")
-    print(f"\nResponse 4: {response4[:200]}{'...' if len(response4) > 200 else ''}")
+    response10 = debugger.chat_with_agent("Delete media plan mediaplan_61d045ed")
+    print(f"\nResponse 10: {response10[:200]}{'...' if len(response10) > 200 else ''}")
 
-    response5 = debugger.chat_with_agent("Show me all my media plans")
-    print(f"\nResponse 5: {response5[:200]}{'...' if len(response5) > 200 else ''}")
 
     # 🔴 BREAKPOINT: Set breakpoint here to inspect final conversation state
     print("\n3. Final inspection...")

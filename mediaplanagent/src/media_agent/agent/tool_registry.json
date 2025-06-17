@@ -422,7 +422,7 @@
         "module_path": "media_agent.tools.mediaplan_tools",
         "category": "mediaplan",
         "priority": 1,
-        "description": "Create new media plan foundation with campaign information.",
+        "description": "Create new media plan foundation with campaign information. Please populate as many of the optional fields as possible based on user inputs.",
 
         "parameters": {
           "campaign_name": {
@@ -445,6 +445,11 @@
             "required": true,
             "description": "Campaign end date in YYYY-MM-DD format"
           },
+          "budget_currency": {
+            "type": "string",
+            "required": false,
+            "description": "Currency in which the budget of this campaign is expressed"
+          },
           "budget_total": {
             "type": "number",
             "required": true,
@@ -454,6 +459,16 @@
             "type": "string",
             "required": true,
             "description": "Name of plan creator"
+          },
+          "agency_name": {
+            "type": "string",
+            "required": false,
+            "description": "Name of the agency managing the campaign"
+          },
+          "advertiser_name": {
+            "type": "string",
+            "required": false,
+            "description": "Name of the advertiser/client organization"
           },
           "product_name": {
             "type": "string",
@@ -469,6 +484,44 @@
             "type": "string",
             "required": false,
             "description": "Name or description of target audience segment"
+          },
+          "audience_age_start": {
+            "type": "integer",
+            "required": false,
+            "description": "Minimum age of the target audience (inclusive)"
+          },
+          "audience_age_end": {
+            "type": "integer",
+            "required": false,
+            "description": "Maximum age of the target audience (inclusive)"
+          },
+          "audience_gender": {
+              "type": "string",
+              "required": false,
+              "enum": ["Male", "Female", "Any"],
+              "description": "Target gender for the campaign audience"
+          },
+          "audience_interests": {
+            "type": "array",
+            "required": false,
+            "items": { "type": "string" },
+            "description": "List of interests and behaviors that define the target audience"
+          },
+          "location_type": {
+            "type": "string",
+            "required": false,
+            "enum": ["Country", "State"],
+            "description": "Geographic scope type for campaign targeting"
+          },
+          "locations": {
+            "type": "array",
+            "required": false,
+            "items": { "type": "string" },
+            "description": "List of geographic locations where the campaign will run (countries or states based on location_type)"
+          },
+          "workflow_status_name": {
+            "type": "string",
+            "description": "Human-readable name of the current workflow status (e.g., Draft, Approved, Live, Paused, Completed)"
           }
         },
 
@@ -476,59 +529,258 @@
         "enables": ["create_lineitem", "save_mediaplan", "validate_mediaplan"]
       },
       "create_lineitem": {
-          "function_name": "create_lineitem",
-          "module_path": "media_agent.tools.mediaplan_tools",
-          "category": "mediaplan",
-          "priority": 5,
-          "description": "Create one or more line items for the current media plan with strategic budget allocation. Supports bulk creation for efficient media mix implementation.",
+        "function_name": "create_lineitem",
+        "module_path": "media_agent.tools.mediaplan_tools",
+        "category": "mediaplan",
+        "priority": 5,
+        "description": "Create one or more line items for the current media plan with comprehensive field support. Supports all standard lineitem schema fields including media placement details, targeting, costs, and performance metrics. Use for implementing tactical media strategies with detailed channel and vehicle specifications.",
 
-          "parameters": {
-            "line_items": {
-              "type": "array",
-              "required": true,
-              "description": "List of line item objects to create. Each object must contain: name (string), start_date (YYYY-MM-DD), end_date (YYYY-MM-DD), cost_total (number). Optional fields include: channel, vehicle, partner, kpi, target_audience, location_type, location_name, adformat, and v2.0 fields like cost_currency, dayparts, inventory, plus all custom dimensions and metrics.",
-              "examples": [
-                [
-                  {
-                    "name": "Facebook Video Campaign",
-                    "start_date": "2025-07-01",
-                    "end_date": "2025-09-30",
-                    "cost_total": 62500,
-                    "channel": "Social",
-                    "vehicle": "Facebook",
-                    "partner": "Meta",
-                    "kpi": "Brand Awareness"
-                  },
-                  {
-                    "name": "Google Search Campaign",
-                    "start_date": "2025-07-01",
-                    "end_date": "2025-09-30",
-                    "cost_total": 50000,
-                    "channel": "Search",
-                    "vehicle": "Google Ads",
-                    "kpi": "Click-through Rate"
-                  }
-                ]
+        "parameters": {
+          "line_items": {
+            "type": "array",
+            "required": true,
+            "description": "List of line item objects to create. Each object supports comprehensive lineitem schema fields.",
+            "items": {
+              "type": "object",
+              "required": ["name", "start_date", "end_date", "cost_total"],
+              "properties": {
+
+                "name": {
+                  "type": "string",
+                  "description": "Human-readable name for the line item (e.g., 'Facebook Video Campaign', 'Google Search - Brand Terms')"
+                },
+                "start_date": {
+                  "type": "string",
+                  "format": "date",
+                  "description": "Line item start date in YYYY-MM-DD format"
+                },
+                "end_date": {
+                  "type": "string",
+                  "format": "date",
+                  "description": "Line item end date in YYYY-MM-DD format"
+                },
+                "cost_total": {
+                  "type": "number",
+                  "description": "Total cost for the line item including all cost components"
+                },
+
+                "channel": {
+                  "type": "string",
+                  "description": "Media channel for the line item (e.g., 'Digital', 'Social', 'Search', 'Display', 'TV', 'Radio', 'Print', 'OOH')",
+                  "examples": ["Digital", "Social", "Search", "Display", "Video", "TV", "Radio", "Print", "OOH", "Audio"]
+                },
+                "vehicle": {
+                  "type": "string",
+                  "description": "Media vehicle or platform (e.g., 'Facebook', 'Google Ads', 'YouTube', 'Instagram', 'LinkedIn', 'TikTok', 'CNN', 'Spotify')",
+                  "examples": ["Facebook", "Google Ads", "YouTube", "Instagram", "LinkedIn", "TikTok", "Twitter", "Pinterest", "Snapchat", "Amazon DSP", "The Trade Desk", "Netflix", "Hulu", "Spotify", "Pandora"]
+                },
+                "partner": {
+                  "type": "string",
+                  "description": "Media partner or vendor handling the placement (e.g., agency trading desk, media vendor)"
+                },
+                "media_product": {
+                  "type": "string",
+                  "description": "Specific media product or ad unit being purchased (e.g., 'News Feed Video', 'Search Ads', 'YouTube TrueView')"
+                },
+
+                "location_type": {
+                  "type": "string",
+                  "enum": ["Country", "State"],
+                  "description": "Geographic scope type for the line item targeting"
+                },
+                "location_name": {
+                  "type": "string",
+                  "description": "Name of the geographic location being targeted (e.g., 'United States', 'California', 'New York')"
+                },
+                "target_audience": {
+                  "type": "string",
+                  "description": "Description of the target audience for this line item (e.g., '25-54 Car Buyers', 'Tech Professionals')"
+                },
+
+                "adformat": {
+                  "type": "string",
+                  "description": "Creative format or ad type (e.g., 'Video', 'Banner', 'Native', 'Carousel', 'Stories', 'Audio')",
+                  "examples": ["Video", "Banner", "Native", "Carousel", "Stories", "Audio", "Image", "Text", "Rich Media", "Interactive"]
+                },
+                "kpi": {
+                  "type": "string",
+                  "description": "Primary key performance indicator for the line item (e.g., 'Brand Awareness', 'Click-through Rate', 'Conversions', 'Video Views')",
+                  "examples": ["Brand Awareness", "Click-through Rate", "Conversions", "Video Views", "Reach", "Impressions", "Engagement", "Lead Generation", "Sales"]
+                },
+
+                "dayparts": {
+                  "type": "string",
+                  "description": "Time periods when the ad should run (e.g., 'Primetime', 'Morning', 'All Day', 'Business Hours')",
+                  "examples": ["All Day", "Morning", "Afternoon", "Evening", "Primetime", "Late Night", "Business Hours", "Weekends"]
+                },
+                "inventory": {
+                  "type": "string",
+                  "description": "Type of inventory or placement being purchased (e.g., 'Premium', 'Programmatic', 'Direct', 'Remnant')",
+                  "examples": ["Premium", "Programmatic", "Direct", "Remnant", "Private Marketplace", "Open Exchange"]
+                },
+
+                "cost_currency": {
+                  "type": "string",
+                  "description": "Currency code for all cost fields in this line item (e.g., 'USD', 'EUR', 'GBP')",
+                  "examples": ["USD", "EUR", "GBP", "CAD", "AUD"]
+                },
+                "cost_media": {
+                  "type": "number",
+                  "description": "Media cost component (working media spend) - typically the largest portion of total cost"
+                },
+                "cost_buying": {
+                  "type": "number",
+                  "description": "Media buying/trading cost component (agency fees, trading desk fees)"
+                },
+                "cost_platform": {
+                  "type": "number",
+                  "description": "Platform or technology cost component (ad tech fees, DSP fees)"
+                },
+                "cost_data": {
+                  "type": "number",
+                  "description": "Data cost component (audience data, targeting data, third-party data)"
+                },
+                "cost_creative": {
+                  "type": "number",
+                  "description": "Creative production and development cost component"
+                },
+
+                "metric_impressions": {
+                  "type": "number",
+                  "description": "Number of ad impressions delivered or planned"
+                },
+                "metric_clicks": {
+                  "type": "number",
+                  "description": "Number of clicks on the ad"
+                },
+                "metric_views": {
+                  "type": "number",
+                  "description": "Number of video views or content views"
+                },
+                "metric_engagements": {
+                  "type": "number",
+                  "description": "Number of user engagements (likes, shares, comments, etc.)"
+                },
+                "metric_followers": {
+                  "type": "number",
+                  "description": "Number of new followers gained"
+                },
+                "metric_visits": {
+                  "type": "number",
+                  "description": "Number of website visits or page visits"
+                },
+                "metric_leads": {
+                  "type": "number",
+                  "description": "Number of leads generated"
+                },
+                "metric_sales": {
+                  "type": "number",
+                  "description": "Number of sales or purchases"
+                },
+                "metric_add_to_cart": {
+                  "type": "number",
+                  "description": "Number of add-to-cart actions"
+                },
+                "metric_app_install": {
+                  "type": "number",
+                  "description": "Number of app installations"
+                },
+                "metric_application_start": {
+                  "type": "number",
+                  "description": "Number of application forms started"
+                },
+                "metric_application_complete": {
+                  "type": "number",
+                  "description": "Number of application forms completed"
+                },
+                "metric_contact_us": {
+                  "type": "number",
+                  "description": "Number of contact form submissions or contact actions"
+                },
+                "metric_download": {
+                  "type": "number",
+                  "description": "Number of downloads (files, apps, content)"
+                },
+                "metric_signup": {
+                  "type": "number",
+                  "description": "Number of signups or registrations"
+                },
+                "metric_max_daily_spend": {
+                  "type": "number",
+                  "description": "Maximum daily spend limit for the line item"
+                },
+                "metric_max_daily_impressions": {
+                  "type": "number",
+                  "description": "Maximum daily impressions limit for the line item"
+                },
+                "metric_audience_size": {
+                  "type": "number",
+                  "description": "Size of the targetable audience for this line item"
+                }
+              }
+            },
+            "examples": [
+              [
+                {
+                  "name": "Facebook Video Awareness Campaign",
+                  "start_date": "2025-07-01",
+                  "end_date": "2025-09-30",
+                  "cost_total": 62500,
+                  "channel": "Social",
+                  "vehicle": "Facebook",
+                  "partner": "Meta",
+                  "media_product": "News Feed Video",
+                  "target_audience": "25-54 Car Buyers",
+                  "adformat": "Video",
+                  "kpi": "Brand Awareness",
+                  "location_type": "State",
+                  "location_name": "New York",
+                  "cost_media": 55000,
+                  "cost_buying": 5000,
+                  "cost_platform": 2500,
+                  "metric_impressions": 5000000,
+                  "metric_views": 1500000
+                },
+                {
+                  "name": "Google Search - Brand Terms",
+                  "start_date": "2025-07-01",
+                  "end_date": "2025-09-30",
+                  "cost_total": 30000,
+                  "channel": "Search",
+                  "vehicle": "Google Ads",
+                  "media_product": "Search Ads",
+                  "target_audience": "In-Market Car Buyers",
+                  "adformat": "Text",
+                  "kpi": "Click-through Rate",
+                  "location_type": "State",
+                  "location_name": "New York",
+                  "cost_media": 28000,
+                  "cost_buying": 2000,
+                  "metric_clicks": 15000,
+                  "metric_visits": 12000
+                }
               ]
-            }
-          },
-
-          "prerequisites": ["current_mediaplan_exists"],
-          "enables": [],
-
-          "triggers": {
-            "user_intents": [
-              "add line items",
-              "create line items",
-              "build media mix",
-              "allocate budget",
-              "add channels",
-              "create tactical plan",
-              "implement strategy"
-            ],
-            "prerequisites": ["strategic_consultation_completed"]
+            ]
           }
         },
+        "prerequisites": ["current_mediaplan_exists"],
+        "triggers": {
+          "user_intents": [
+            "add line items",
+            "create line items",
+            "build media mix",
+            "allocate budget",
+            "add channels",
+            "create tactical plan",
+            "implement strategy",
+            "add Facebook campaign",
+            "add Google ads",
+            "add social media",
+            "add search campaign",
+            "add display advertising"
+          ]
+        }
+      },
       "save_mediaplan": {
         "function_name": "save_mediaplan",
         "module_path": "media_agent.tools.mediaplan_tools",

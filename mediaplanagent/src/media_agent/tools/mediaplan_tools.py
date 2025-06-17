@@ -17,21 +17,31 @@ from .base import register_tool, create_success_result, create_error_result
 
 logger = logging.getLogger(__name__)
 
+
 def create_mediaplan(
-    session_state,
-    campaign_name: str,
-    campaign_objective: str,
-    start_date: str,
-    end_date: str,
-    budget_total: float,
-    created_by: str,
-    product_name: Optional[str] = None,
-    product_description: Optional[str] = None,
-    target_audience_name: Optional[str] = None,
-    **kwargs
+        session_state,
+        campaign_name: str,
+        campaign_objective: str,
+        start_date: str,
+        end_date: str,
+        budget_total: float,
+        created_by: str,
+        product_name: Optional[str] = None,
+        product_description: Optional[str] = None,
+        target_audience_name: Optional[str] = None,
+        **kwargs
 ) -> Dict[str, Any]:
     """
-    Create a basic media plan with campaign information.
+    Create a media plan with campaign information.
+
+    Supports all campaign schema fields as optional parameters including:
+    - Agency information (agency_id, agency_name)
+    - Advertiser information (advertiser_id, advertiser_name)
+    - Audience targeting (audience_age_start, audience_age_end, audience_gender, audience_interests)
+    - Geographic targeting (location_type, locations)
+    - Campaign classification (campaign_type_id, campaign_type_name)
+    - Workflow status (workflow_status_id, workflow_status_name)
+    - Budget settings (budget_currency)
 
     Args:
         session_state: Current session state
@@ -44,7 +54,7 @@ def create_mediaplan(
         product_name: Product being advertised (optional)
         product_description: Product description (optional)
         target_audience_name: Target audience description (optional)
-        **kwargs: Additional arguments (ignored for compatibility)
+        **kwargs: Additional campaign fields from campaign schema (all optional)
 
     Returns:
         Success/error result with media plan information
@@ -81,7 +91,12 @@ def create_mediaplan(
                 error="Invalid date range"
             )
 
-        # Create media plan using MediaPlanPy SDK
+        # Map target_audience_name to audience_name for SDK compatibility
+        if target_audience_name and 'audience_name' not in kwargs:
+            kwargs['audience_name'] = target_audience_name
+
+        # Create media plan using MediaPlanPy SDK with all parameters
+        # The SDK's create() method will automatically route kwargs to appropriate model objects
         media_plan = MediaPlan.create(
             created_by=created_by,
             campaign_name=campaign_name,
@@ -92,13 +107,13 @@ def create_mediaplan(
             workspace_manager=session_state.workspace_manager,
             product_name=product_name,
             product_description=product_description,
-            audience_name=target_audience_name
+            **kwargs  # 🔥 FIXED: Now passing through all additional arguments
         )
 
         # Store in session state
         session_state.current_mediaplan = media_plan
 
-        # Extract information for response
+        # Extract information for response including schema fields
         campaign_info = {
             "media_plan_id": media_plan.meta.id,
             "campaign_id": media_plan.campaign.id,
@@ -107,18 +122,47 @@ def create_mediaplan(
             "budget": float(media_plan.campaign.budget_total),
             "start_date": media_plan.campaign.start_date.isoformat(),
             "end_date": media_plan.campaign.end_date.isoformat(),
-            "created_by_name": media_plan.meta.created_by_name,  # ← Fixed for v2.0
+            "created_by_name": media_plan.meta.created_by_name,
             "created_at": media_plan.meta.created_at.isoformat(),
             "schema_version": media_plan.meta.schema_version,
             "lineitem_count": len(media_plan.lineitems)
         }
 
+        # Include additional campaign fields that were set
+        additional_fields = {}
+        campaign_dict = media_plan.campaign.to_dict()
+
+        # List of optional fields that might have been set via kwargs
+        optional_campaign_fields = [
+            'agency_id', 'agency_name', 'advertiser_id', 'advertiser_name',
+            'product_id', 'campaign_type_id', 'campaign_type_name',
+            'audience_name', 'audience_age_start', 'audience_age_end',
+            'audience_gender', 'audience_interests', 'location_type', 'locations',
+            'workflow_status_id', 'workflow_status_name', 'budget_currency'
+        ]
+
+        for field in optional_campaign_fields:
+            value = campaign_dict.get(field)
+            if value is not None:
+                additional_fields[field] = value
+
+        if additional_fields:
+            campaign_info["additional_campaign_fields"] = additional_fields
+
         logger.info(f"Successfully created media plan: {media_plan.meta.id}")
 
+        success_message = (
+            f"✅ Created media plan '{campaign_name}' successfully! "
+            f"Budget: ${budget_total:,.2f}, Duration: {start_date} to {end_date}. "
+        )
+
+        if additional_fields:
+            success_message += f"Additional campaign fields configured: {', '.join(additional_fields.keys())}. "
+
+        success_message += "Ready to add line items or save to workspace."
+
         return create_success_result(
-            f"✅ Created media plan '{campaign_name}' successfully! " +
-            f"Budget: ${budget_total:,.2f}, Duration: {start_date} to {end_date}. " +
-            f"Ready to add line items or save to workspace.",
+            success_message,
             campaign_info=campaign_info,
             media_plan_id=media_plan.meta.id,
             next_steps=[
