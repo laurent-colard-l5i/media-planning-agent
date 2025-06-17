@@ -742,7 +742,7 @@ def run_debug_scenario_conversation():
     response2 = debugger.chat_with_agent("I am planning a campaign in Q325 which will be targeting car purchasers in New York State with a total budget of $250,000, with the objective to drive awareness and consideration. Please assign a name and a description based on this brief. My email address is lc@planmatic.io")
     print(f"\nResponse 2: {response2[:200]}{'...' if len(response2) > 200 else ''}")
 
-    response3 = debugger.chat_with_agent("Add line items for Facebook and Google with strategic budget allocation")
+    response3 = debugger.chat_with_agent("Add line items for Facebook and Google with strategic budget allocation then save the media plan")
     print(f"\nResponse 3: {response3[:200]}{'...' if len(response3) > 200 else ''}")
 
     response4 = debugger.chat_with_agent("Save the media plan")

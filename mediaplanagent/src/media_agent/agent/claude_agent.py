@@ -240,6 +240,7 @@ Never summarize tool results - show the actual data returned."""
     def chat(self, message: str, use_tools: bool = True) -> str:
         """
         Send message to Claude and get response with tool execution.
+        Now supports chaining multiple tool executions in sequence.
 
         Args:
             message: User message
@@ -271,104 +272,15 @@ Never summarize tool results - show the actual data returned."""
 
             logger.debug(f"Received response with {len(response.content)} content blocks")
 
-            response_text = ""
-            tool_calls_made = []
-
-            # Process response content with better error handling
-            for i, content_block in enumerate(response.content):
-                logger.debug(f"Processing content block {i}: type={content_block.type}")
-
-                if content_block.type == "text":
-                    response_text += content_block.text
-                    logger.debug(f"Added text content: {safe_log_text(content_block.text)}")
-
-                elif content_block.type == "tool_use":
-                    logger.debug(f"Executing tool: {content_block.name}")
-                    # Execute tool and collect results
-                    tool_result = self._execute_tool(content_block)
-                    tool_calls_made.append({
-                        "tool_name": content_block.name,
-                        "result": tool_result,
-                        "tool_use_id": content_block.id
-                    })
-                    logger.debug(f"Tool {content_block.name} executed, success: {tool_result.get('success', 'unknown')}")
-
-            # If tools were called, we need to continue the conversation
-            if tool_calls_made:
-                logger.debug(f"Processing {len(tool_calls_made)} tool results")
-
-                # Add assistant message with tool calls to history
-                self.conversation_history.append({
-                    "role": "assistant",
-                    "content": response.content
-                })
-
-                # Add tool results to history with custom JSON encoder
-                for i, tool_call in enumerate(tool_calls_made):
-                    try:
-                        # Use custom encoder to handle dates and decimals
-                        tool_result_json = json.dumps(tool_call["result"], cls=CustomJSONEncoder)
-                        logger.debug(f"Successfully serialized tool result for {tool_call['tool_name']}")
-                    except Exception as e:
-                        logger.error(f"Failed to serialize tool result for {tool_call['tool_name']}: {e}")
-                        # Fallback: create a safe JSON representation
-                        tool_result_json = json.dumps({
-                            "success": tool_call["result"].get("success", False),
-                            "message": str(tool_call["result"].get("message", "Serialization error")),
-                            "error": f"JSON serialization failed: {str(e)}"
-                        })
-
-                    self.conversation_history.append({
-                        "role": "user",
-                        "content": [{
-                            "type": "tool_result",
-                            "tool_use_id": tool_call["tool_use_id"],
-                            "content": tool_result_json
-                        }]
-                    })
-
-                # Get follow-up response after tool execution
-                logger.debug("Getting follow-up response from Claude")
-                follow_up_response = self.client.messages.create(
-                    model=self.model_name,
-                    max_tokens=self.max_tokens,
-                    system=self.system_prompt,
-                    messages=self.conversation_history,
-                    tools=tools
-                )
-
-                logger.debug(f"Follow-up response has {len(follow_up_response.content)} content blocks")
-
-                # Extract text from follow-up response with error handling
-                follow_up_text = ""
-                for i, content_block in enumerate(follow_up_response.content):
-                    logger.debug(f"Processing follow-up content block {i}: type={content_block.type}")
-                    if content_block.type == "text":
-                        follow_up_text += content_block.text
-                        logger.debug(f"Added follow-up text: {safe_log_text(content_block.text)}")
-
-                response_text = follow_up_text
-
-                # Add follow-up to history
-                if follow_up_text:
-                    self.conversation_history.append({
-                        "role": "assistant",
-                        "content": follow_up_text
-                    })
-            else:
-                # No tools called, add response to history
-                if response_text:
-                    self.conversation_history.append({
-                        "role": "assistant",
-                        "content": response_text
-                    })
+            # Process response and handle tool execution loop
+            final_response_text = self._process_response_with_tool_loop(response, tools)
 
             # Store conversation in session state
-            if response_text:
-                self.session_state.add_conversation_turn(message, response_text)
+            if final_response_text:
+                self.session_state.add_conversation_turn(message, final_response_text)
 
-            logger.debug(f"Final response length: {len(response_text)} characters")
-            return response_text or "I executed some tools but didn't provide a text response."
+            logger.debug(f"Final response length: {len(final_response_text)} characters")
+            return final_response_text or "I executed some tools but didn't provide a text response."
 
         except Exception as e:
             logger.error(f"Claude communication error: {e}")
@@ -384,6 +296,131 @@ Never summarize tool results - show the actual data returned."""
             })
 
             raise AgentCommunicationError(f"Claude communication failed: {str(e)}")
+
+    def _process_response_with_tool_loop(self, response, tools, max_iterations: int = 10) -> str:
+        """
+        Process Claude response with support for chained tool executions.
+
+        Args:
+            response: Initial Claude response
+            tools: Available tools for function calling
+            max_iterations: Maximum number of tool execution iterations to prevent infinite loops
+
+        Returns:
+            Final text response from Claude
+        """
+        current_response = response
+        iteration = 0
+        final_text = ""
+
+        while iteration < max_iterations:
+            iteration += 1
+            logger.debug(f"Processing response iteration {iteration}")
+
+            response_text = ""
+            tool_calls_made = []
+
+            # Process all content blocks in current response
+            for i, content_block in enumerate(current_response.content):
+                logger.debug(f"Processing content block {i}: type={content_block.type}")
+
+                if content_block.type == "text":
+                    response_text += content_block.text
+                    logger.debug(f"Added text content: {safe_log_text(content_block.text)}")
+
+                elif content_block.type == "tool_use":
+                    logger.debug(f"Executing tool: {content_block.name}")
+                    # Execute tool and collect results
+                    tool_result = self._execute_tool(content_block)
+                    tool_calls_made.append({
+                        "tool_name": content_block.name,
+                        "result": tool_result,
+                        "tool_use_id": content_block.id
+                    })
+                    logger.debug(
+                        f"Tool {content_block.name} executed, success: {tool_result.get('success', 'unknown')}")
+
+            # If no tools were called in this iteration, we're done
+            if not tool_calls_made:
+                final_text = response_text
+                logger.debug(f"No tools called in iteration {iteration}, finishing with text response")
+                break
+
+            # Add assistant message with tool calls to history
+            self.conversation_history.append({
+                "role": "assistant",
+                "content": current_response.content
+            })
+
+            # Add tool results to history
+            for tool_call in tool_calls_made:
+                try:
+                    # Use custom encoder to handle dates and decimals
+                    tool_result_json = json.dumps(tool_call["result"], cls=CustomJSONEncoder)
+                    logger.debug(f"Successfully serialized tool result for {tool_call['tool_name']}")
+                except Exception as e:
+                    logger.error(f"Failed to serialize tool result for {tool_call['tool_name']}: {e}")
+                    # Fallback: create a safe JSON representation
+                    tool_result_json = json.dumps({
+                        "success": tool_call["result"].get("success", False),
+                        "message": str(tool_call["result"].get("message", "Serialization error")),
+                        "error": f"JSON serialization failed: {str(e)}"
+                    })
+
+                self.conversation_history.append({
+                    "role": "user",
+                    "content": [{
+                        "type": "tool_result",
+                        "tool_use_id": tool_call["tool_use_id"],
+                        "content": tool_result_json
+                    }]
+                })
+
+            # Get follow-up response from Claude
+            logger.debug(f"Getting follow-up response from Claude (iteration {iteration})")
+            try:
+                current_response = self.client.messages.create(
+                    model=self.model_name,
+                    max_tokens=self.max_tokens,
+                    system=self.system_prompt,
+                    messages=self.conversation_history,
+                    tools=tools
+                )
+                logger.debug(f"Follow-up response has {len(current_response.content)} content blocks")
+            except Exception as e:
+                logger.error(f"Failed to get follow-up response in iteration {iteration}: {e}")
+                # Return what we have so far
+                final_text = response_text
+                break
+
+            # Store any text from this iteration (in case Claude provides intermediate updates)
+            if response_text:
+                if final_text:
+                    final_text += "\n\n" + response_text
+                else:
+                    final_text = response_text
+
+        # Handle max iterations reached
+        if iteration >= max_iterations:
+            logger.warning(f"Reached maximum tool execution iterations ({max_iterations})")
+            final_text += f"\n\n⚠️ Reached maximum tool execution limit ({max_iterations} iterations). Some operations may be incomplete."
+
+        # Add final response to history if it contains new text
+        if current_response and hasattr(current_response, 'content'):
+            final_response_text = ""
+            for content_block in current_response.content:
+                if content_block.type == "text":
+                    final_response_text += content_block.text
+
+            if final_response_text and final_response_text != final_text:
+                self.conversation_history.append({
+                    "role": "assistant",
+                    "content": final_response_text
+                })
+                final_text = final_response_text
+
+        logger.debug(f"Tool execution loop completed after {iteration} iterations")
+        return final_text
 
     def _execute_tool(self, tool_call) -> Dict[str, Any]:
         """
